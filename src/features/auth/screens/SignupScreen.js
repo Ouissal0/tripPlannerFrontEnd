@@ -51,27 +51,47 @@ const SignupScreen = ({ navigation }) => {
   };
 
   const handleSignup = async () => {
-    if (formData.password !== formData.confirmPassword) {
-      Alert.alert('Error', 'Passwords do not match');
-      return;
-    }
+    try {
+      // Validation des champs obligatoires
+      const requiredFields = ['userName', 'firstName', 'lastName', 'email', 'password', 'confirmPassword'];
+      const missingFields = requiredFields.filter(field => !formData[field]);
+      
+      if (missingFields.length > 0) {
+        Alert.alert('Error', 'Please fill in all required fields');
+        return;
+      }
 
-    const userData = {
-      userName: formData.userName,
-      firstName: formData.firstName,
-      lastName: formData.lastName,
-      email: formData.email,
-      phoneNumber: formData.phoneNumber,
-      password: formData.password,
-      profileImage: formData.profileImage,
-      role: role,
-    };
+      if (formData.password !== formData.confirmPassword) {
+        Alert.alert('Error', 'Passwords do not match');
+        return;
+      }
 
-    const result = await AuthController.handleSignup(userData);
-    if (result.success) {
-      navigation.navigate('LoginScreen');
-    } else {
-      Alert.alert('Error', result.error);
+      const result = await AuthController.handleSignup(formData, role);
+      console.log("Résultat de l'inscription:", result);
+      
+      if (result.success) {
+        Alert.alert(
+          'Registration Successful',
+          'Your account has been created successfully! Please login with your credentials.',
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                // Reset navigation stack and navigate to Login
+                navigation.reset({
+                  index: 0,
+                  routes: [{ name: 'LoginScreen' }],
+                });
+              }
+            }
+          ]
+        );
+      } else {
+        Alert.alert('Error', result.error || 'Failed to create account');
+      }
+    } catch (error) {
+      console.error('Signup error:', error);
+      Alert.alert('Error', 'An unexpected error occurred. Please try again.');
     }
   };
 

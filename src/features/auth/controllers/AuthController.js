@@ -1,13 +1,14 @@
 import AuthService from '../services/AuthService';
 import * as FileSystem from 'expo-file-system';
-import { Alert } from 'react-native'; // Ajout de l'import
+import { Alert } from 'react-native';
+
 class AuthController {
   constructor() {
-    this.authService = AuthService; // Utilise directement l'instance exportée
+    // Ne pas importer AuthService dans le constructeur
   }
 
-   // Méthode pour encoder l'image en base64
-   async encodeImageToBase64(imageUri) {
+  // Méthode pour encoder l'image en base64
+  async encodeImageToBase64(imageUri) {
     if (!imageUri) return null;
     try {
       const base64 = await FileSystem.readAsStringAsync(imageUri, {
@@ -16,97 +17,89 @@ class AuthController {
       return `data:image/jpeg;base64,${base64}`;
     } catch (error) {
       console.error("Erreur lors de l'encodage de l'image:", error);
-      // S'assurer que Alert est disponible
-     
       return null;
     }
   }
 
-  async handleSignup(formData, role, navigation) {
+  async handleLogin(formData) {
     try {
-      const base64Image = await this.encodeImageToBase64(formData.profileImage);
-      
+      console.log('handleLogin appelé avec:', formData);
+      const response = await AuthService.login(formData.username, formData.password);
+      console.log('Réponse du service:', response);
+
+      if (response && response.success) {
+        return {
+          success: true,
+          message: response.message,
+          data: {
+            user: response.data.user
+          }
+        };
+      } else {
+        return {
+          success: false,
+          error: response.error || 'Échec de la connexion'
+        };
+      }
+    } catch (error) {
+      console.error("Erreur lors de la connexion:", error);
+      return {
+        success: false,
+        error: error.message || 'Une erreur est survenue lors de la connexion'
+      };
+    }
+  }
+
+  async handleSignup(formData, role) {
+    try {
+      // Encode l'image seulement si elle existe
+      let base64Image = null;
+      if (formData.profileImage) {
+        base64Image = await this.encodeImageToBase64(formData.profileImage);
+      }
+
       const userData = {
         username: formData.userName,
         password: formData.password,
         firstName: formData.firstName,
         lastName: formData.lastName,
         email: formData.email,
-        picture: base64Image, // Image encodée en base64
+        picture: base64Image,
         phoneNumber: formData.phoneNumber,
         role: role,
       };
 
       console.log("Données à envoyer:", userData);
   
-      const response = await this.authService.registerUser(userData);
-      if (response.success) {
-       // Naviguer vers la page de connexion
-      navigation.navigate('LoginScreen'); // Assurez-vous que le nom correspond à celui défini dans votre navigation
-  
-      } else {
-        if (typeof Alert !== 'undefined') {
-          Alert.alert('Erreur', response.error);
-        } else {
-          console.error("Alert n'est pas défini", response.error);
-        }
-      }
+      const response = await AuthService.signup(userData);
+      return response; // AuthService.signup retourne déjà le bon format
     } catch (error) {
-      console.error("Erreur lors de l'encodage de l'image:", error);
-      if (typeof Alert !== 'undefined') {
-        Alert.alert("Erreur", "Impossible d'encoder l'image.");
-      } else {
-        console.error("Alert n'est pas défini");
-      }
-    }
-  }
-
-  async handleLogin(email, password) {
-    try {
-      // Validation basique
-      if (!email || !password) {
-        throw new Error('Email and password are required');
-      }
-
-      if (!this.validateEmail(email)) {
-        throw new Error('Invalid email format');
-      }
-
-      // Tentative de connexion
-      const user = await this.authService.login(email, password);
-      return {
-        success: true,
-        user,
-        message: 'Login successful'
-      };
-    } catch (error) {
+      console.error("Erreur lors de l'inscription:", error);
       return {
         success: false,
-        error: error.message || 'Login failed'
+        error: error.message || "Une erreur est survenue lors de l'inscription"
       };
     }
   }
-
-  
 
   async handleLogout() {
     try {
-      await this.authService.logout();
+      await AuthService.logout();
       return {
         success: true,
-        message: 'Logout successful'
+        message: 'Déconnexion réussie'
       };
     } catch (error) {
       return {
         success: false,
-        error: error.message || 'Logout failed'
+        error: error.message || 'Erreur lors de la déconnexion'
       };
     }
   }
 
   async checkAuthStatus() {
     try {
-      const user = await this.authService.getCurrentUser();
+      const user = await AuthService.getCurrentUser();
       return {
         isAuthenticated: !!user,
         user
@@ -125,7 +118,7 @@ class AuthController {
         throw new Error('Invalid email format');
       }
 
-      await this.authService.resetPassword(email);
+      await AuthService.resetPassword(email);
       return {
         success: true,
         message: 'Password reset email sent'
@@ -145,7 +138,7 @@ class AuthController {
         throw new Error(validationResult.error);
       }
 
-      const updatedUser = await this.authService.updateProfile(userData);
+      const updatedUser = await AuthService.updateProfile(userData);
       return {
         success: true,
         user: updatedUser,

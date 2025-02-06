@@ -14,22 +14,51 @@ import AuthController from '../../auth/controllers/AuthController';
 import { Alert } from 'react-native';
 
 const LoginScreen = ({ navigation }) => {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState(''); // Change from email to username
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async () => {
     if (loading) return;
+    if (!username || !password) {
+      Alert.alert('Erreur', 'Veuillez remplir tous les champs');
+      return;
+    }
+
     setLoading(true);
+    setError(null);
+
     try {
-      const user = await AuthController.handleLogin(email, password);
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'MainScreen' }],
-      });
+      console.log('Tentative de connexion avec:', { username, password });
+      const result = await AuthController.handleLogin({ username, password });
+      console.log('Résultat de la connexion:', result);
+      
+      if (result && result.success) {
+        console.log('Navigation vers MainScreen avec:', result.data.user);
+        // Navigation vers MainScreen après une connexion réussie
+        navigation.reset({
+          index: 0,
+          routes: [
+            { 
+              name: 'MainScreen',
+              params: { 
+                showWelcomeMessage: true,
+                userData: result.data.user 
+              }
+            }
+          ],
+        });
+      } else {
+        const errorMsg = result?.error || 'Une erreur est survenue lors de la connexion';
+        setError(errorMsg);
+        Alert.alert('Erreur de connexion', errorMsg);
+      }
     } catch (error) {
-      setError(error.message);
+      console.error('Erreur de connexion:', error);
+      const errorMessage = error.message || 'Une erreur est survenue lors de la connexion';
+      setError(errorMessage);
+      Alert.alert('Erreur', errorMessage);
     } finally {
       setLoading(false);
     }
@@ -56,11 +85,10 @@ const LoginScreen = ({ navigation }) => {
         <View style={styles.formSection}>
           <TextInput
             style={[commonStyles.input, styles.input]}
-            placeholder="Email"
+            placeholder="Username" // Change placeholder to Username
             placeholderTextColor={colors.textSecondary}
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
+            value={username}
+            onChangeText={setUsername}
             autoCapitalize="none"
           />
 

@@ -1,344 +1,231 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  TextInput,
   TouchableOpacity,
+  TextInput,
   ScrollView,
-  Image,
   FlatList,
   Dimensions,
   RefreshControl,
+  ImageBackground,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
+import { colors, spacing } from '../../../styles/commonStyles';
+import AuthService from '../../auth/services/AuthService';
 
 const { width } = Dimensions.get('window');
 
-const HomeScreen = ({ navigation }) => {
+const HomeScreen = ({ navigation, route }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedInterests, setSelectedInterests] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [userData, setUserData] = useState(null);
 
-  // Simulated user preferences
-  const userPreferences = {
-    interests: ['Beach', 'Culture'],
-    favoriteDestinations: ['Greece', 'Japan'],
-    budget: 'medium',
+  useEffect(() => {
+    loadUserData();
+  }, []);
+
+  const loadUserData = async () => {
+    try {
+      const user = await AuthService.getUserData();
+      setUserData(user);
+    } catch (error) {
+      console.error('Error loading user data:', error);
+    }
   };
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    // Simulate data refresh
-    setTimeout(() => setRefreshing(false), 2000);
+    // Add your refresh logic here
+    setTimeout(() => {
+      setRefreshing(false);
+    }, 2000);
   }, []);
 
-  const popularPlaces = [
+  const interests = [
+    'Adventure', 'Culture', 'Nature', 'Food', 'Beach',
+    'Mountains', 'Cities', 'History', 'Art', 'Shopping'
+  ];
+
+  const quickActions = [
+    {
+      icon: 'map-outline',
+      title: 'Explore',
+      onPress: () => navigation.navigate('Map'),
+    },
+    {
+      icon: 'calendar-outline',
+      title: 'Plan Trip',
+      onPress: () => navigation.navigate('CreateTrip'),
+    },
+    {
+      icon: 'heart-outline',
+      title: 'Favorites',
+      onPress: () => navigation.navigate('Favorites'),
+    },
+    {
+      icon: 'people-outline',
+      title: 'Groups',
+      onPress: () => navigation.navigate('Groups'),
+    },
+  ];
+
+  const popularDestinations = [
     {
       id: '1',
-      name: 'Santorini, Greece',
+      name: 'Paris',
+      country: 'France',
       image: require('../../../assets/image.png'),
       rating: 4.8,
-      description: 'Beautiful island with white-washed buildings',
-      priceRange: '€€€',
-      activities: ['Beach', 'Sightseeing', 'Dining'],
     },
     {
       id: '2',
-      name: 'Kyoto, Japan',
+      name: 'Tokyo',
+      country: 'Japan',
+      image: require('../../../assets/image.png'),
+      rating: 4.9,
+    },
+    {
+      id: '3',
+      name: 'New York',
+      country: 'USA',
       image: require('../../../assets/image.png'),
       rating: 4.7,
-      description: 'Traditional Japanese culture and temples',
-      priceRange: '€€',
-      activities: ['Culture', 'Temples', 'Gardens'],
     },
   ];
-
-  const interests = [
-    { id: '1', name: 'Beach', icon: 'umbrella' },
-    { id: '2', name: 'Mountains', icon: 'mountain' },
-    { id: '3', name: 'Culture', icon: 'museum' },
-    { id: '4', name: 'Adventure', icon: 'compass' },
-    { id: '5', name: 'Food', icon: 'restaurant' },
-    { id: '6', name: 'Nature', icon: 'leaf' },
-  ];
-
-  const organizedTrips = [
-    {
-      id: '1',
-      name: 'Greek Islands Explorer',
-      image: require('../../../assets/image.png'),
-      duration: '7 days',
-      price: '$1,999',
-      rating: 4.9,
-      interests: ['Beach', 'Culture'],
-      startDate: '2025-06-15',
-      groupSize: '8-12 people',
-    },
-    {
-      id: '2',
-      name: 'Japanese Culture Tour',
-      image: require('../../../assets/image.png'),
-      duration: '10 days',
-      price: '$2,499',
-      rating: 4.8,
-      interests: ['Culture', 'Food'],
-      startDate: '2025-07-01',
-      groupSize: '6-10 people',
-    },
-  ];
-
-  const upcomingTrips = [
-    {
-      id: '1',
-      name: 'Paris Weekend',
-      image: require('../../../assets/image.png'),
-      startDate: '2025-03-15',
-      endDate: '2025-03-17',
-      status: 'confirmed',
-    },
-    {
-      id: '2',
-      name: 'Barcelona Adventure',
-      image: require('../../../assets/image.png'),
-      startDate: '2025-05-01',
-      endDate: '2025-05-07',
-      status: 'planning',
-    },
-  ];
-
-  const personalizedSuggestions = [
-    {
-      id: '1',
-      name: 'Bali Retreat',
-      image: require('../../../assets/image.png'),
-      reason: 'Based on your interest in beaches',
-      price: '$1,799',
-      duration: '6 days',
-    },
-    {
-      id: '2',
-      name: 'Rome Cultural Tour',
-      image: require('../../../assets/image.png'),
-      reason: 'Matches your cultural preferences',
-      price: '$1,599',
-      duration: '5 days',
-    },
-  ];
-
-  const toggleInterest = (interest) => {
-    setSelectedInterests(prev =>
-      prev.includes(interest)
-        ? prev.filter(i => i !== interest)
-        : [...prev, interest]
-    );
-  };
-
-  const filteredTrips = selectedInterests.length > 0
-    ? organizedTrips.filter(trip =>
-        trip.interests.some(interest => selectedInterests.includes(interest))
-      )
-    : organizedTrips;
 
   const renderSearchBar = () => (
     <View style={styles.searchContainer}>
-      <Icon name="search" size={20} color="#666" style={styles.searchIcon} />
+      <Icon name="search-outline" size={20} color={colors.textSecondary} />
       <TextInput
         style={styles.searchInput}
-        placeholder="Search destinations, activities, or trips..."
-        placeholderTextColor="#666"
+        placeholder="Search destinations..."
         value={searchQuery}
         onChangeText={setSearchQuery}
+        placeholderTextColor={colors.textSecondary}
       />
-      <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.searchClearButton}>
-        {searchQuery ? <Icon name="close-circle" size={20} color="#666" /> : null}
-      </TouchableOpacity>
     </View>
   );
 
   const renderQuickActions = () => (
     <View style={styles.quickActionsContainer}>
-      <TouchableOpacity
-        style={styles.quickActionButton}
-        onPress={() => navigation.navigate('CreateTrip')}
-      >
-        <Icon name="add-circle" size={24} color="#fff" />
-        <Text style={styles.quickActionButtonText}>Create New Trip</Text>
-      </TouchableOpacity>
+      <Text style={styles.sectionTitle}>Quick Actions</Text>
+      <View style={styles.quickActionsGrid}>
+        {quickActions.map((action, index) => (
+          <TouchableOpacity
+            key={index}
+            style={styles.quickActionItem}
+            onPress={action.onPress}
+          >
+            <View style={styles.quickActionIcon}>
+              <Icon name={action.icon} size={24} color={colors.primary} />
+            </View>
+            <Text style={styles.quickActionText}>{action.title}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
     </View>
   );
 
-  const renderUpcomingTrips = () => (
-    <View style={styles.section}>
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Your Upcoming Trips</Text>
-        <TouchableOpacity onPress={() => navigation.navigate('Trips')}>
-          <Text style={styles.seeAllButton}>See All</Text>
-        </TouchableOpacity>
-      </View>
+  const renderInterests = () => (
+    <View style={styles.interestsContainer}>
+      <Text style={styles.sectionTitle}>Explore Interests</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-        {upcomingTrips.map((trip) => (
+        {interests.map((interest, index) => (
           <TouchableOpacity
-            key={trip.id}
-            style={styles.upcomingTripCard}
-            onPress={() => navigation.navigate('TripDetails', { trip })}
+            key={index}
+            style={[
+              styles.interestChip,
+              selectedInterests.includes(interest) && styles.selectedInterestChip,
+            ]}
+            onPress={() => {
+              if (selectedInterests.includes(interest)) {
+                setSelectedInterests(selectedInterests.filter(item => item !== interest));
+              } else {
+                setSelectedInterests([...selectedInterests, interest]);
+              }
+            }}
           >
-            <Image source={trip.image} style={styles.upcomingTripImage} />
-            <View style={styles.upcomingTripInfo}>
-              <Text style={styles.upcomingTripName}>{trip.name}</Text>
-              <Text style={styles.upcomingTripDate}>{trip.startDate} - {trip.endDate}</Text>
-              <View style={[
-                styles.statusBadge,
-                { backgroundColor: trip.status === 'confirmed' ? '#4CAF50' : '#FFA000' }
-              ]}>
-                <Text style={styles.statusText}>
-                  {trip.status === 'confirmed' ? 'Confirmed' : 'Planning'}
-                </Text>
-              </View>
-            </View>
+            <Text
+              style={[
+                styles.interestText,
+                selectedInterests.includes(interest) && styles.selectedInterestText,
+              ]}
+            >
+              {interest}
+            </Text>
           </TouchableOpacity>
         ))}
       </ScrollView>
     </View>
   );
 
-  const renderPopularPlace = ({ item }) => (
+  const renderDestinationCard = ({ item }) => (
     <TouchableOpacity
-      style={styles.popularPlaceCard}
+      style={styles.destinationCard}
       onPress={() => navigation.navigate('PlaceDetails', { place: item })}
     >
-      <Image source={item.image} style={styles.placeImage} />
-      <View style={styles.placeInfo}>
-        <View style={styles.placeHeader}>
-          <Text style={styles.placeName}>{item.name}</Text>
+      <ImageBackground
+        source={item.image}
+        style={styles.destinationImage}
+        imageStyle={{ borderRadius: 15 }}
+      >
+        <View style={styles.destinationOverlay}>
+          <View style={styles.destinationInfo}>
+            <Text style={styles.destinationName}>{item.name}</Text>
+            <Text style={styles.destinationCountry}>{item.country}</Text>
+          </View>
           <View style={styles.ratingContainer}>
             <Icon name="star" size={16} color="#FFD700" />
             <Text style={styles.ratingText}>{item.rating}</Text>
           </View>
         </View>
-        <Text style={styles.priceRange}>{item.priceRange}</Text>
-        <View style={styles.activitiesContainer}>
-          {item.activities.map((activity, index) => (
-            <View key={index} style={styles.activityTag}>
-              <Text style={styles.activityText}>{activity}</Text>
-            </View>
-          ))}
-        </View>
-      </View>
-    </TouchableOpacity>
-  );
-
-  const renderPersonalizedSuggestion = ({ item }) => (
-    <TouchableOpacity
-      style={styles.suggestionCard}
-      onPress={() => navigation.navigate('TripDetails', { trip: item })}
-    >
-      <Image source={item.image} style={styles.suggestionImage} />
-      <View style={styles.suggestionInfo}>
-        <Text style={styles.suggestionName}>{item.name}</Text>
-        <Text style={styles.suggestionReason}>{item.reason}</Text>
-        <View style={styles.suggestionDetails}>
-          <Text style={styles.suggestionPrice}>{item.price}</Text>
-          <Text style={styles.suggestionDuration}>{item.duration}</Text>
-        </View>
-      </View>
+      </ImageBackground>
     </TouchableOpacity>
   );
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView 
-        style={styles.scrollView}
+      <ScrollView
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
-        {renderSearchBar()}
-        {renderQuickActions()}
-        
-        {/* Upcoming Trips Section */}
-        {upcomingTrips.length > 0 && renderUpcomingTrips()}
+        <ImageBackground
+          source={require('../../../assets/imageSignup.png')}
+          style={styles.header}
+        >
+          <View style={styles.headerContent}>
+            <Text style={styles.welcomeText}>
+              Welcome back{userData ? `, ${userData.firstName}!` : '!'}
+            </Text>
+            <Text style={styles.headerSubtitle}>
+              Where would you like to explore today?
+            </Text>
+          </View>
+        </ImageBackground>
 
-        {/* Popular Places Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Popular Places</Text>
-          <FlatList
-            data={popularPlaces}
-            renderItem={renderPopularPlace}
-            keyExtractor={item => item.id}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.popularPlacesList}
-          />
-        </View>
-
-        {/* Organized Trips Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Popular Organized Trips</Text>
+        <View style={styles.content}>
+          {renderSearchBar()}
           
-          {/* Interests Filter */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.interestsScroll}>
-            {interests.map(interest => (
-              <TouchableOpacity
-                key={interest.id}
-                style={[
-                  styles.interestChip,
-                  selectedInterests.includes(interest.name) && styles.interestChipSelected
-                ]}
-                onPress={() => toggleInterest(interest.name)}
-              >
-                <Icon name={interest.icon} size={16} color={selectedInterests.includes(interest.name) ? '#fff' : '#666'} />
-                <Text style={[
-                  styles.interestChipText,
-                  selectedInterests.includes(interest.name) && styles.interestChipTextSelected
-                ]}>
-                  {interest.name}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+          {renderInterests()}
 
-          <FlatList
-            data={filteredTrips}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={styles.tripCard}
-                onPress={() => navigation.navigate('TripDetails', { trip: item })}
-              >
-                <Image source={item.image} style={styles.tripImage} />
-                <View style={styles.tripInfo}>
-                  <Text style={styles.tripName}>{item.name}</Text>
-                  <View style={styles.tripDetails}>
-                    <Text style={styles.tripDuration}>{item.duration}</Text>
-                    <Text style={styles.tripPrice}>{item.price}</Text>
-                  </View>
-                  <View style={styles.ratingContainer}>
-                    <Icon name="star" size={16} color="#FFD700" />
-                    <Text style={styles.ratingText}>{item.rating}</Text>
-                  </View>
-                </View>
-              </TouchableOpacity>
-            )}
-            keyExtractor={item => item.id}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.tripsList}
-          />
-        </View>
-
-        {/* Personalized Suggestions Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Suggested for You</Text>
-          <Text style={styles.sectionSubtitle}>Based on your preferences</Text>
-          <FlatList
-            data={personalizedSuggestions}
-            renderItem={renderPersonalizedSuggestion}
-            keyExtractor={item => item.id}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.suggestionsList}
-          />
+          <View style={styles.popularContainer}>
+            <Text style={styles.sectionTitle}>Popular Destinations</Text>
+            <FlatList
+              data={popularDestinations}
+              renderItem={renderDestinationCard}
+              keyExtractor={item => item.id}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.destinationsList}
+            />
+            {renderQuickActions()}
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -348,294 +235,183 @@ const HomeScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.white,
   },
-  scrollView: {
-    flex: 1,
+  header: {
+    height: 200,
+    justifyContent: 'flex-end',
+  },
+  headerContent: {
+    padding: spacing.xl,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+  },
+  welcomeText: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: colors.white,
+    marginBottom: spacing.xs,
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: -1, height: 1 },
+    textShadowRadius: 10,
+  },
+  headerSubtitle: {
+    fontSize: 16,
+    color: colors.white,
+    opacity: 0.9,
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: -1, height: 1 },
+    textShadowRadius: 10,
+  },
+  content: {
+    marginTop: -20,
+    backgroundColor: colors.white,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: spacing.l,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    paddingTop: 8,
-  },
-  searchIcon: {
-    marginRight: 8,
+    backgroundColor: colors.background,
+    paddingHorizontal: spacing.m,
+    borderRadius: 15,
+    marginBottom: spacing.l,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
   },
   searchInput: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
-    padding: 12,
-    borderRadius: 25,
+    paddingVertical: spacing.m,
+    paddingHorizontal: spacing.s,
     fontSize: 16,
-    paddingLeft: 40,
-  },
-  searchClearButton: {
-    position: 'absolute',
-    right: 24,
-    top: 20,
-  },
-  quickActionsContainer: {
-    padding: 10,
-    paddingTop: 0,
-
-  },
-  quickActionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#2196F3',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 16,
-  },
-  quickActionButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 8,
-  },
-  section: {
-    padding: 12,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
+    color: colors.text,
   },
   sectionTitle: {
     fontSize: 20,
-    fontWeight: '600',
-    marginBottom:2,
+    fontWeight: 'bold',
+    color: colors.text,
+    marginBottom: spacing.m,
   },
-  sectionSubtitle: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 16,
+  quickActionsContainer: {
+    marginBottom: spacing.xl,
   },
-  seeAllButton: {
-    color: '#2196F3',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  popularPlacesList: {
-    marginTop: 16,
-  },
-  popularPlaceCard: {
-    width: width * 0.7,
-    marginRight: 16,
-    marginLeft:5,
-    marginBottom:5,
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  placeImage: {
-    width: '100%',
-    height: 180,
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
-  },
-  placeInfo: {
-    padding: 12,
-  },
-  placeHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  placeName: {
-    fontSize: 16,
-    fontWeight: '600',
-    flex: 1,
-    marginRight: 8,
-  },
-  priceRange: {
-    fontSize: 14,
-    color: '#2196F3',
-    marginBottom: 8,
-  },
-  activitiesContainer: {
+  quickActionsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    justifyContent: 'space-between',
   },
-  activityTag: {
-    backgroundColor: '#f5f5f5',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-    marginRight: 4,
-    marginBottom: 4,
+  quickActionItem: {
+    width: (width - spacing.l * 3) / 2,
+    backgroundColor: colors.white,
+    padding: spacing.m,
+    borderRadius: 15,
+    marginBottom: spacing.m,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
   },
-  activityText: {
-    fontSize: 12,
-    color: '#666',
+  quickActionIcon: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: colors.background,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.s,
+  },
+  quickActionText: {
+    fontSize: 14,
+    color: colors.text,
+    fontWeight: '500',
+  },
+  interestsContainer: {
+    marginBottom: spacing.xl,
+  },
+  interestChip: {
+    paddingHorizontal: spacing.m,
+    paddingVertical: spacing.s,
+    backgroundColor: colors.background,
+    borderRadius: 20,
+    marginRight: spacing.s,
+  },
+  selectedInterestChip: {
+    backgroundColor: colors.primary,
+  },
+  interestText: {
+    fontSize: 14,
+    color: colors.text,
+  },
+  selectedInterestText: {
+    color: colors.white,
+  },
+  popularContainer: {
+    marginBottom: spacing.xl,
+  },
+  destinationsList: {
+    paddingRight: spacing.l,
+  },
+  destinationCard: {
+    width: width * 0.8,
+    height: 200,
+    marginRight: spacing.m,
+  },
+  destinationImage: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  destinationOverlay: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    padding: spacing.m,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderBottomLeftRadius: 15,
+    borderBottomRightRadius: 15,
+  },
+  destinationInfo: {
+    flex: 1,
+  },
+  destinationName: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: colors.white,
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: -1, height: 1 },
+    textShadowRadius: 10,
+  },
+  destinationCountry: {
+    fontSize: 14,
+    color: colors.white,
+    opacity: 0.9,
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: -1, height: 1 },
+    textShadowRadius: 10,
   },
   ratingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    paddingHorizontal: spacing.s,
+    paddingVertical: 4,
+    borderRadius: 12,
   },
   ratingText: {
     marginLeft: 4,
     fontSize: 14,
-    color: '#666',
-  },
-  interestsScroll: {
-    marginVertical: 16,
-  },
-  interestChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 20,
-    marginRight: 8,
-  },
-  interestChipSelected: {
-    backgroundColor: '#2196F3',
-  },
-  interestChipText: {
-    fontSize: 14,
-    color: '#666',
-    marginLeft: 6,
-  },
-  interestChipTextSelected: {
-    color: '#fff',
-  },
-  upcomingTripCard: {
-    width: width * 0.7,
-    marginRight: 16,
-    marginLeft:4,
-    marginBottom: 4,
-    marginTop:1, 
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  upcomingTripImage: {
-    width: '100%',
-    height: 150,
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
-  },
-  upcomingTripInfo: {
-    padding: 12,
-  },
-  upcomingTripName: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  upcomingTripDate: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 8,
-  },
-  statusBadge: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-  },
-  statusText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  suggestionCard: {
-    width: width * 0.7,
-    marginRight: 16,
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    marginBottom:5,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  suggestionImage: {
-    width: '100%',
-    height: 150,
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
-  },
-  suggestionInfo: {
-    padding: 12,
-  },
-  suggestionName: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  suggestionReason: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 8,
-  },
-  suggestionDetails: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  suggestionPrice: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#2196F3',
-  },
-  suggestionDuration: {
-    fontSize: 14,
-    color: '#666',
-  },
-  tripCard: {
-    width: 300,
-    marginRight: 16,
-    marginBottom: 4,
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  tripImage: {
-    width: '100%',
-    height: 180,
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
-  },
-  tripInfo: {
-    padding: 12,
-  },
-  tripName: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  tripDetails: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  tripDuration: {
-    fontSize: 14,
-    color: '#666',
-  },
-  tripPrice: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#2196F3',
+    fontWeight: 'bold',
+    color: colors.text,
   },
 });
 
