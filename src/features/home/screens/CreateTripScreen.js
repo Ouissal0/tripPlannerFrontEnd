@@ -9,11 +9,16 @@ import {
   Platform,
   KeyboardAvoidingView,
   FlatList,
+  Switch,
+  StatusBar,
+  Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import Slider from '@react-native-community/slider';
+import ImagePickerComponent from '../../../components/ImagePicker';
+import { colors, spacing, borderRadius } from '../../../styles/commonStyles';
 
 const TRANSPORT_MODES = [
   { id: 'car', icon: 'car', label: 'Car' },
@@ -31,7 +36,6 @@ const INTERESTS = [
   { id: 'shopping', label: 'Shopping', icon: 'cart' },
 ];
 
-// Exemple de destinations populaires pour les suggestions
 const POPULAR_DESTINATIONS = [
   'Paris, France',
   'London, UK',
@@ -41,6 +45,30 @@ const POPULAR_DESTINATIONS = [
   'Barcelona, Spain',
   'Dubai, UAE',
   'Sydney, Australia',
+];
+
+const ACCOMMODATION_TYPES = [
+  { id: 'hotel', icon: 'bed', label: 'Hotel' },
+  { id: 'apartment', icon: 'home', label: 'Apartment' },
+  { id: 'hostel', icon: 'people', label: 'Hostel' },
+  { id: 'resort', icon: 'umbrella', label: 'Resort' },
+  { id: 'camping', icon: 'bonfire', label: 'Camping' },
+];
+
+const MEAL_PREFERENCES = [
+  { id: 'any', label: 'Any', icon: 'restaurant' },
+  { id: 'vegetarian', label: 'Vegetarian', icon: 'leaf' },
+  { id: 'vegan', label: 'Vegan', icon: 'nutrition' },
+  { id: 'halal', label: 'Halal', icon: 'moon' },
+  { id: 'kosher', label: 'Kosher', icon: 'star' },
+];
+
+const LANGUAGES = [
+  { id: 'english', label: 'English', icon: 'language' },
+  { id: 'french', label: 'French', icon: 'language' },
+  { id: 'spanish', label: 'Spanish', icon: 'language' },
+  { id: 'arabic', label: 'Arabic', icon: 'language' },
+  { id: 'chinese', label: 'Chinese', icon: 'language' },
 ];
 
 const CreateTripScreen = ({ navigation }) => {
@@ -55,6 +83,20 @@ const CreateTripScreen = ({ navigation }) => {
     budget: 1000,
     activities: [],
     companions: [],
+    accommodationType: 'hotel',
+    accommodationBudget: 200,
+    mealPreferences: [],
+    insuranceRequired: false,
+    visaRequired: false,
+    languages: [],
+    numberOfTravelers: 1,
+    specialRequirements: '',
+    emergencyContact: {
+      name: '',
+      phone: '',
+      relationship: '',
+    },
+    images: [], 
   });
 
   const [showStartDate, setShowStartDate] = useState(false);
@@ -67,6 +109,7 @@ const CreateTripScreen = ({ navigation }) => {
   const [showActivityTime, setShowActivityTime] = useState(false);
   const [showDestinationSuggestions, setShowDestinationSuggestions] = useState(false);
   const [destinationQuery, setDestinationQuery] = useState('');
+  const [currentCompanion, setCurrentCompanion] = useState('');
 
   const filteredDestinations = POPULAR_DESTINATIONS.filter(destination =>
     destination.toLowerCase().includes(destinationQuery.toLowerCase())
@@ -118,312 +161,301 @@ const CreateTripScreen = ({ navigation }) => {
     });
   };
 
-  const addCompanion = (email) => {
-    if (email && !tripData.companions.includes(email)) {
-      setTripData(prev => ({
-        ...prev,
-        companions: [...prev.companions, email],
-      }));
-    }
-  };
+  const handleSubmit = async () => {
+    try {
+      const formData = {
+        title: tripData.title,
+        mainDestination: tripData.mainDestination,
+        startDate: tripData.startDate.toISOString(),
+        endDate: tripData.endDate.toISOString(),
+        intermediateStops: tripData.intermediateStops,
+        transportMode: tripData.transportMode,
+        interests: tripData.interests,
+        budget: parseFloat(tripData.budget),
+        activities: tripData.activities.map(activity => ({
+          ...activity,
+          time: activity.time.toISOString()
+        })),
+        companions: tripData.companions,
+        accommodationType: tripData.accommodationType,
+        accommodationBudget: parseFloat(tripData.accommodationBudget),
+        mealPreferences: tripData.mealPreferences,
+        insuranceRequired: tripData.insuranceRequired,
+        visaRequired: tripData.visaRequired,
+        languages: tripData.languages,
+        numberOfTravelers: parseInt(tripData.numberOfTravelers),
+        specialRequirements: tripData.specialRequirements,
+        emergencyContact: tripData.emergencyContact,
+        images: tripData.images.map(img => img.base64)
+      };
 
-  const removeCompanion = (email) => {
-    setTripData(prev => ({
-      ...prev,
-      companions: prev.companions.filter(e => e !== email),
-    }));
+      if (!formData.title) {
+        throw new Error('Title is required');
+      }
+      if (!formData.mainDestination) {
+        throw new Error('Main destination is required');
+      }
+
+      navigation.navigate('TripDetails', { tripData: formData });
+    } catch (error) {
+      console.error('Error formatting trip data:', error);
+      Alert.alert('Error', error.message || 'Failed to prepare trip data');
+    }
   };
 
   const handleGenerateItinerary = () => {
-    // Validation
-    if (!tripData.title || !tripData.mainDestination) {
-      alert('Please fill in the required fields (title and destination)');
-      return;
-    }
-
-    // Navigate to summary screen with all data
-    navigation.navigate('TripSummary', { tripData });
+    handleSubmit();
   };
+
+  const renderSectionTitle = (title, icon) => (
+    <View style={styles.sectionTitleContainer}>
+      <Icon name={icon} size={24} color={colors.primary} />
+      <Text style={styles.sectionTitle}>{title}</Text>
+    </View>
+  );
+
+  const renderChipSelection = (items, selectedItems, onSelect, multiple = true) => (
+    <View style={styles.chipContainer}>
+      {items.map((item) => {
+        const isSelected = multiple 
+          ? selectedItems.includes(item.id)
+          : selectedItems === item.id;
+        return (
+          <TouchableOpacity
+            key={item.id}
+            style={[
+              styles.chip,
+              isSelected && styles.chipSelected,
+            ]}
+            onPress={() => onSelect(item.id)}
+          >
+            <Icon 
+              name={item.icon} 
+              size={20} 
+              color={isSelected ? colors.white : colors.primary}
+            />
+            <Text style={[
+              styles.chipText,
+              isSelected && styles.chipTextSelected,
+            ]}>
+              {item.label}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
 
   return (
     <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView 
+      <StatusBar barStyle="dark-content" />
+      
+      <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+        >
+          <Icon name="arrow-back" size={24} color={colors.text} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Create New Trip</Text>
+        <TouchableOpacity style={styles.saveButton} onPress={handleSubmit}>
+          <Text style={styles.saveButtonText}>Create</Text>
+        </TouchableOpacity>
+      </View>
+
+      <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
       >
-        <ScrollView style={styles.scrollView}>
-          {/* Header */}
-          <View style={styles.header}>
-            <TouchableOpacity
-              style={styles.backButton}
-              onPress={() => navigation.goBack()}
-            >
-              <Icon name="arrow-back" size={24} color="#000" />
-            </TouchableOpacity>
-            <Text style={styles.headerTitle}>Create New Trip</Text>
-          </View>
-
-          {/* Title Input */}
+        <ScrollView 
+          style={styles.scrollView}
+          showsVerticalScrollIndicator={false}
+        >
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Trip Title *</Text>
-            <TextInput
-              style={styles.input}
-              value={tripData.title}
-              onChangeText={(text) => setTripData(prev => ({ ...prev, title: text }))}
-              placeholder="Enter trip title"
-            />
-          </View>
-
-          {/* Main Destination */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Main Destination *</Text>
-            <View style={styles.destinationContainer}>
+            {renderSectionTitle('Basic Information', 'information-circle-outline')}
+            
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Trip Title</Text>
               <TextInput
                 style={styles.input}
-                value={destinationQuery}
-                onChangeText={(text) => {
-                  setDestinationQuery(text);
-                  setShowDestinationSuggestions(true);
-                }}
-                placeholder="Search destination"
-                onFocus={() => setShowDestinationSuggestions(true)}
+                placeholder="Give your trip a catchy name"
+                value={tripData.title}
+                onChangeText={(text) => setTripData({ ...tripData, title: text })}
               />
-              {showDestinationSuggestions && destinationQuery.length > 0 && (
-                <View style={styles.suggestionsContainer}>
-                  {filteredDestinations.map((destination) => (
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Destination</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Where are you going?"
+                value={tripData.mainDestination}
+                onChangeText={(text) => setTripData({ ...tripData, mainDestination: text })}
+              />
+              {tripData.mainDestination.length > 0 && (
+                <FlatList
+                  data={POPULAR_DESTINATIONS.filter(dest =>
+                    dest.toLowerCase().includes(tripData.mainDestination.toLowerCase())
+                  )}
+                  renderItem={({ item }) => (
                     <TouchableOpacity
-                      key={destination}
                       style={styles.suggestionItem}
-                      onPress={() => selectDestination(destination)}
+                      onPress={() => setTripData({ ...tripData, mainDestination: item })}
                     >
-                      <Icon name="location" size={20} color="#2196F3" />
-                      <Text style={styles.suggestionText}>{destination}</Text>
+                      <Icon name="location-outline" size={20} color={colors.primary} />
+                      <Text style={styles.suggestionText}>{item}</Text>
                     </TouchableOpacity>
-                  ))}
-                </View>
+                  )}
+                  keyExtractor={item => item}
+                  style={styles.suggestionsList}
+                />
               )}
+            </View>
+
+            <View style={styles.dateContainer}>
+              <View style={styles.dateInput}>
+                <Text style={styles.label}>Start Date</Text>
+                <TouchableOpacity
+                  style={styles.dateButton}
+                  onPress={() => setShowStartDate(true)}
+                >
+                  <Icon name="calendar-outline" size={20} color={colors.primary} />
+                  <Text style={styles.dateText}>
+                    {tripData.startDate.toLocaleDateString()}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.dateInput}>
+                <Text style={styles.label}>End Date</Text>
+                <TouchableOpacity
+                  style={styles.dateButton}
+                  onPress={() => setShowEndDate(true)}
+                >
+                  <Icon name="calendar-outline" size={20} color={colors.primary} />
+                  <Text style={styles.dateText}>
+                    {tripData.endDate.toLocaleDateString()}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
 
-          {/* Dates */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Travel Dates</Text>
-            <View style={styles.dateContainer}>
-              <TouchableOpacity
-                style={styles.dateButton}
-                onPress={() => setShowStartDate(true)}
-              >
-                <Icon name="calendar" size={20} color="#2196F3" />
-                <Text style={styles.dateButtonText}>
-                  {tripData.startDate.toLocaleDateString()}
-                </Text>
-              </TouchableOpacity>
-              <Text style={styles.dateSeperator}>to</Text>
-              <TouchableOpacity
-                style={styles.dateButton}
-                onPress={() => setShowEndDate(true)}
-              >
-                <Icon name="calendar" size={20} color="#2196F3" />
-                <Text style={styles.dateButtonText}>
-                  {tripData.endDate.toLocaleDateString()}
-                </Text>
-              </TouchableOpacity>
-            </View>
-            {(showStartDate || showEndDate) && (
-              <DateTimePicker
-                value={showStartDate ? tripData.startDate : tripData.endDate}
-                mode="date"
-                display="default"
-                onChange={(event, selectedDate) =>
-                  handleDateChange(
-                    event,
-                    selectedDate,
-                    showStartDate ? 'startDate' : 'endDate'
-                  )
-                }
-              />
+            {renderSectionTitle('Transport', 'car-outline')}
+            {renderChipSelection(
+              TRANSPORT_MODES,
+              tripData.transportMode,
+              (mode) => setTripData({ ...tripData, transportMode: mode }),
+              false
             )}
           </View>
 
-          {/* Transport Mode */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Transport Mode</Text>
-            <View style={styles.transportContainer}>
-              {TRANSPORT_MODES.map(mode => (
-                <TouchableOpacity
-                  key={mode.id}
-                  style={[
-                    styles.transportButton,
-                    tripData.transportMode === mode.id && styles.transportButtonActive,
-                  ]}
-                  onPress={() => setTripData(prev => ({ ...prev, transportMode: mode.id }))}
-                >
-                  <Icon
-                    name={mode.icon}
-                    size={24}
-                    color={tripData.transportMode === mode.id ? '#fff' : '#2196F3'}
-                  />
-                  <Text
-                    style={[
-                      styles.transportText,
-                      tripData.transportMode === mode.id && styles.transportTextActive,
-                    ]}
-                  >
-                    {mode.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          {/* Interests */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Interests</Text>
-            <View style={styles.interestsContainer}>
-              {INTERESTS.map(interest => (
-                <TouchableOpacity
-                  key={interest.id}
-                  style={[
-                    styles.interestButton,
-                    tripData.interests.includes(interest.id) && styles.interestButtonActive,
-                  ]}
-                  onPress={() => toggleInterest(interest.id)}
-                >
-                  <Icon
-                    name={interest.icon}
-                    size={24}
-                    color={tripData.interests.includes(interest.id) ? '#fff' : '#2196F3'}
-                  />
-                  <Text
-                    style={[
-                      styles.interestText,
-                      tripData.interests.includes(interest.id) && styles.interestTextActive,
-                    ]}
-                  >
-                    {interest.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          {/* Budget */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Budget Estimate</Text>
-            <Slider
-              style={styles.slider}
-              minimumValue={100}
-              maximumValue={10000}
-              step={100}
-              value={tripData.budget}
-              onValueChange={(value) =>
-                setTripData(prev => ({ ...prev, budget: value }))
+            {renderSectionTitle('Interests', 'heart-outline')}
+            {renderChipSelection(
+              INTERESTS,
+              tripData.interests,
+              (interest) => {
+                const newInterests = tripData.interests.includes(interest)
+                  ? tripData.interests.filter(i => i !== interest)
+                  : [...tripData.interests, interest];
+                setTripData({ ...tripData, interests: newInterests });
               }
-              minimumTrackTintColor="#2196F3"
-              maximumTrackTintColor="#000000"
-            />
-            <Text style={styles.budgetText}>
-              ${Math.round(tripData.budget).toLocaleString()}
-            </Text>
+            )}
           </View>
 
-          {/* Activities */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Activities</Text>
-            <View style={styles.activityInputContainer}>
-              <TextInput
-                style={styles.activityInput}
-                value={currentActivity.name}
-                onChangeText={(text) =>
-                  setCurrentActivity(prev => ({ ...prev, name: text }))
-                }
-                placeholder="Activity name"
+            {renderSectionTitle('Budget', 'wallet-outline')}
+            <View style={styles.budgetContainer}>
+              <Text style={styles.budgetValue}>${tripData.budget}</Text>
+              <Slider
+                style={styles.slider}
+                minimumValue={100}
+                maximumValue={10000}
+                step={100}
+                value={tripData.budget}
+                onValueChange={(value) => setTripData({ ...tripData, budget: value })}
+                minimumTrackTintColor={colors.primary}
+                maximumTrackTintColor={colors.border}
+                thumbTintColor={colors.primary}
               />
-              <TouchableOpacity
-                style={styles.timeButton}
-                onPress={() => setShowActivityTime(true)}
-              >
-                <Icon name="time" size={20} color="#2196F3" />
-                <Text style={styles.timeButtonText}>
-                  {currentActivity.time.toLocaleTimeString([], {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-                </Text>
-              </TouchableOpacity>
-            </View>
-            <TextInput
-              style={styles.activityDescriptionInput}
-              value={currentActivity.description}
-              onChangeText={(text) =>
-                setCurrentActivity(prev => ({ ...prev, description: text }))
-              }
-              placeholder="Activity description"
-              multiline
-            />
-            <TouchableOpacity style={styles.addButton} onPress={addActivity}>
-              <Icon name="add" size={24} color="#fff" />
-              <Text style={styles.addButtonText}>Add Activity</Text>
-            </TouchableOpacity>
-
-            {/* Activity List */}
-            {tripData.activities.map(activity => (
-              <View key={activity.id} style={styles.activityItem}>
-                <View style={styles.activityItemHeader}>
-                  <Text style={styles.activityItemTitle}>{activity.name}</Text>
-                  <TouchableOpacity
-                    onPress={() => removeActivity(activity.id)}
-                    style={styles.removeButton}
-                  >
-                    <Icon name="close" size={20} color="#ff6b6b" />
-                  </TouchableOpacity>
-                </View>
-                <Text style={styles.activityItemTime}>
-                  {activity.time.toLocaleTimeString([], {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-                </Text>
-                <Text style={styles.activityItemDescription}>
-                  {activity.description}
-                </Text>
+              <View style={styles.budgetLabels}>
+                <Text style={styles.budgetLabel}>$100</Text>
+                <Text style={styles.budgetLabel}>$10,000</Text>
               </View>
-            ))}
+            </View>
           </View>
 
-          {/* Companions */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Travel Companions</Text>
-            <View style={styles.companionInputContainer}>
-              <TextInput
-                style={styles.companionInput}
-                placeholder="Enter companion's email"
-                onSubmitEditing={(event) => addCompanion(event.nativeEvent.text)}
-                returnKeyType="done"
-              />
-            </View>
-            {tripData.companions.map(email => (
-              <View key={email} style={styles.companionItem}>
-                <Text style={styles.companionEmail}>{email}</Text>
-                <TouchableOpacity
-                  onPress={() => removeCompanion(email)}
-                  style={styles.removeButton}
-                >
-                  <Icon name="close" size={20} color="#ff6b6b" />
-                </TouchableOpacity>
-              </View>
-            ))}
+            {renderSectionTitle('Trip Photos', 'images-outline')}
+            <ImagePickerComponent
+              images={tripData.images}
+              onImagesSelected={(images) => setTripData({ ...tripData, images })}
+            />
           </View>
 
-          {/* Generate Button */}
-          <TouchableOpacity
-            style={styles.generateButton}
-            onPress={handleGenerateItinerary}
-          >
-            <Text style={styles.generateButtonText}>Generate Itinerary</Text>
-          </TouchableOpacity>
+          <View style={styles.section}>
+            {renderSectionTitle('Additional Options', 'options-outline')}
+            <View style={styles.switchContainer}>
+              <View style={styles.switchItem}>
+                <Text style={styles.switchLabel}>Insurance Required</Text>
+                <Switch
+                  value={tripData.insuranceRequired}
+                  onValueChange={(value) =>
+                    setTripData({ ...tripData, insuranceRequired: value })
+                  }
+                  trackColor={{ false: colors.border, true: colors.primary }}
+                  thumbColor={colors.white}
+                />
+              </View>
+              <View style={styles.switchItem}>
+                <Text style={styles.switchLabel}>Visa Required</Text>
+                <Switch
+                  value={tripData.visaRequired}
+                  onValueChange={(value) =>
+                    setTripData({ ...tripData, visaRequired: value })
+                  }
+                  trackColor={{ false: colors.border, true: colors.primary }}
+                  thumbColor={colors.white}
+                />
+              </View>
+            </View>
+          </View>
+
+          <View style={{ height: 100 }} />
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {showStartDate && (
+        <DateTimePicker
+          value={tripData.startDate}
+          mode="date"
+          display="default"
+          onChange={(event, selectedDate) => {
+            setShowStartDate(false);
+            if (selectedDate) {
+              setTripData({ ...tripData, startDate: selectedDate });
+            }
+          }}
+          minimumDate={new Date()}
+        />
+      )}
+
+      {showEndDate && (
+        <DateTimePicker
+          value={tripData.endDate}
+          mode="date"
+          display="default"
+          onChange={(event, selectedDate) => {
+            setShowEndDate(false);
+            if (selectedDate) {
+              setTripData({ ...tripData, endDate: selectedDate });
+            }
+          }}
+          minimumDate={tripData.startDate}
+        />
+      )}
     </SafeAreaView>
   );
 };
@@ -431,254 +463,167 @@ const CreateTripScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
-  },
-  scrollView: {
-    flex: 1,
-    padding: 16,
+    backgroundColor: colors.background,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 24,
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.l,
+    paddingVertical: spacing.m,
+    backgroundColor: colors.background,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
   backButton: {
-    padding: 8,
+    padding: spacing.s,
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
-    marginLeft: 16,
+    color: colors.text,
+  },
+  saveButton: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.l,
+    paddingVertical: spacing.s,
+    borderRadius: borderRadius.m,
+  },
+  saveButtonText: {
+    color: colors.white,
+    fontWeight: '600',
+  },
+  scrollView: {
+    flex: 1,
   },
   section: {
-    marginBottom: 24,
+    padding: spacing.l,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  sectionTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.m,
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 12,
+    fontWeight: 'bold',
+    color: colors.text,
+    marginLeft: spacing.s,
+  },
+  inputContainer: {
+    marginBottom: spacing.m,
+  },
+  label: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginBottom: spacing.xs,
   },
   input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
+    backgroundColor: colors.backgroundLight,
+    padding: spacing.m,
+    borderRadius: borderRadius.m,
     fontSize: 16,
+    color: colors.text,
   },
-  dateContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  dateButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    flex: 1,
-  },
-  dateButtonText: {
-    marginLeft: 8,
-    fontSize: 16,
-  },
-  dateSeperator: {
-    marginHorizontal: 12,
-    color: '#666',
-  },
-  transportContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginTop: 8,
-  },
-  transportButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#2196F3',
-    borderRadius: 8,
-    marginRight: 12,
-    marginBottom: 12,
-  },
-  transportButtonActive: {
-    backgroundColor: '#2196F3',
-  },
-  transportText: {
-    marginLeft: 8,
-    color: '#2196F3',
-  },
-  transportTextActive: {
-    color: '#fff',
-  },
-  interestsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginTop: 8,
-  },
-  interestButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#2196F3',
-    borderRadius: 8,
-    marginRight: 12,
-    marginBottom: 12,
-  },
-  interestButtonActive: {
-    backgroundColor: '#2196F3',
-  },
-  interestText: {
-    marginLeft: 8,
-    color: '#2196F3',
-  },
-  interestTextActive: {
-    color: '#fff',
-  },
-  slider: {
-    height: 40,
-  },
-  budgetText: {
-    textAlign: 'center',
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#2196F3',
-  },
-  activityInputContainer: {
-    flexDirection: 'row',
-    marginBottom: 8,
-  },
-  activityInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    marginRight: 8,
-  },
-  timeButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-  },
-  timeButtonText: {
-    marginLeft: 8,
-  },
-  activityDescriptionInput: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    height: 80,
-    textAlignVertical: 'top',
-    marginBottom: 8,
-  },
-  addButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#2196F3',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 16,
-  },
-  addButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    marginLeft: 8,
-  },
-  activityItem: {
-    backgroundColor: '#f5f5f5',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 8,
-  },
-  activityItemHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  activityItemTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  activityItemTime: {
-    color: '#666',
-    marginTop: 4,
-  },
-  activityItemDescription: {
-    marginTop: 8,
-  },
-  removeButton: {
-    padding: 4,
-  },
-  companionInputContainer: {
-    marginBottom: 12,
-  },
-  companionInput: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-  },
-  companionItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 8,
-  },
-  companionEmail: {
-    fontSize: 16,
-  },
-  generateButton: {
-    backgroundColor: '#2196F3',
-    padding: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 8,
-    marginBottom: 24,
-  },
-  generateButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  destinationContainer: {
-    position: 'relative',
-    zIndex: 1,
-  },
-  suggestionsContainer: {
-    position: 'absolute',
-    top: '100%',
-    left: 0,
-    right: 0,
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#ddd',
+  suggestionsList: {
     maxHeight: 200,
-    zIndex: 2,
+    marginTop: spacing.xs,
   },
   suggestionItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
+    padding: spacing.m,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: colors.border,
   },
   suggestionText: {
-    marginLeft: 8,
+    marginLeft: spacing.s,
+    color: colors.text,
+  },
+  dateContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: spacing.m,
+  },
+  dateInput: {
+    flex: 1,
+  },
+  dateButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.backgroundLight,
+    padding: spacing.m,
+    borderRadius: borderRadius.m,
+  },
+  dateText: {
+    marginLeft: spacing.s,
+    color: colors.text,
+  },
+  chipContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.s,
+  },
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.backgroundLight,
+    paddingHorizontal: spacing.m,
+    paddingVertical: spacing.s,
+    borderRadius: borderRadius.l,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  chipSelected: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  chipText: {
+    marginLeft: spacing.xs,
+    color: colors.text,
+  },
+  chipTextSelected: {
+    color: colors.white,
+  },
+  budgetContainer: {
+    alignItems: 'center',
+    paddingVertical: spacing.m,
+  },
+  budgetValue: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: colors.primary,
+    marginBottom: spacing.m,
+  },
+  slider: {
+    width: '100%',
+    height: 40,
+  },
+  budgetLabels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+    marginTop: spacing.xs,
+  },
+  budgetLabel: {
+    color: colors.textSecondary,
+    fontSize: 12,
+  },
+  switchContainer: {
+    gap: spacing.m,
+  },
+  switchItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: colors.backgroundLight,
+    padding: spacing.m,
+    borderRadius: borderRadius.m,
+  },
+  switchLabel: {
+    color: colors.text,
     fontSize: 16,
   },
 });

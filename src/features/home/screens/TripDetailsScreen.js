@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -6,68 +6,139 @@ import {
   ScrollView,
   Image,
   TouchableOpacity,
-  FlatList,
+  Dimensions,
+  StatusBar,
+  Animated,
+  Share,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
+import { colors, spacing, borderRadius } from '../../../styles/commonStyles';
+import { tripService } from '../services/tripService';
+
+const { width, height } = Dimensions.get('window');
+const HEADER_HEIGHT = height * 0.45;
+const HEADER_MIN_HEIGHT = 90;
 
 const TripDetailsScreen = ({ route, navigation }) => {
-  const { trip } = route.params || {};
+  const { tripData } = route.params;
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Default itinerary if none is provided
-  const defaultItinerary = [
-    {
-      id: '1',
-      day: 'Day 1',
-      title: 'Arrival & Welcome',
-      activities: [
-        'Airport pickup',
-        'Hotel check-in',
-        'Welcome dinner',
-      ],
-    },
-    {
-      id: '2',
-      day: 'Day 2',
-      title: 'City Exploration',
-      activities: [
-        'Guided city tour',
-        'Visit to historical sites',
-        'Local market visit',
-      ],
-    },
-  ];
+  const headerHeight = scrollY.interpolate({
+    inputRange: [0, HEADER_HEIGHT - HEADER_MIN_HEIGHT],
+    outputRange: [HEADER_HEIGHT, HEADER_MIN_HEIGHT],
+    extrapolate: 'clamp',
+  });
 
-  // Use trip's itinerary if available, otherwise use default
-  const itinerary = trip?.itinerary || defaultItinerary;
+  const headerTitleOpacity = scrollY.interpolate({
+    inputRange: [0, HEADER_HEIGHT - HEADER_MIN_HEIGHT],
+    outputRange: [0, 1],
+    extrapolate: 'clamp',
+  });
 
-  const renderItineraryDay = ({ item }) => (
-    <View style={styles.dayContainer}>
-      <View style={styles.dayHeader}>
-        <Text style={styles.dayText}>{item.day}</Text>
-        <Text style={styles.dayTitle}>{item.title}</Text>
-      </View>
-      {item.activities?.map((activity, index) => (
-        <View key={index} style={styles.activityItem}>
-          <Icon name="checkmark-circle" size={20} color="#2196F3" />
-          <Text style={styles.activityText}>{activity}</Text>
-        </View>
-      ))}
+  const imageOpacity = scrollY.interpolate({
+    inputRange: [0, HEADER_HEIGHT - HEADER_MIN_HEIGHT],
+    outputRange: [1, 0],
+    extrapolate: 'clamp',
+  });
+
+  const handleShare = async () => {
+    try {
+      await Share.share({
+        message: `Check out my trip to ${tripData.mainDestination}!`,
+        title: tripData.title,
+      });
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const formatDate = (date) => {
+    return new Date(date).toLocaleDateString('fr-FR', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+  };
+
+  const renderSectionTitle = (title, icon) => (
+    <View style={styles.sectionTitleContainer}>
+      <Icon name={icon} size={24} color={colors.primary} />
+      <Text style={styles.sectionTitle}>{title}</Text>
     </View>
   );
 
-  if (!trip) {
+  const handleConfirmTrip = async () => {
+    try {
+      setIsSubmitting(true);
+      console.log('Submitting trip data:', tripData);
+      const response = await tripService.createTrip(tripData);
+      console.log('Trip created successfully:', response);
+      Alert.alert(
+        'Success',
+        'Trip created successfully!',
+        [
+          {
+            text: 'OK',
+            onPress: () => navigation.navigate('HomeScreen')
+          }
+        ]
+      );
+    } catch (error) {
+      console.error('Failed to create trip:', error);
+      Alert.alert(
+        'Error',
+        error.message || 'Failed to create trip. Please try again.',
+        [
+          {
+            text: 'OK',
+            onPress: () => setIsSubmitting(false)
+          }
+        ]
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleEditTrip = () => {
+    navigation.goBack();
+  };
+
+  const renderDetailItem = (label, value, icon) => {
+    if (value === undefined || value === null) return null;
+    
+    return (
+      <View style={styles.detailItem}>
+        <View style={styles.labelContainer}>
+          {icon && <Icon name={icon} size={20} color="#2196F3" style={styles.icon} />}
+          <Text style={styles.label}>{label}:</Text>
+        </View>
+        {Array.isArray(value) ? (
+          <View style={styles.arrayValue}>
+            {value.map((item, index) => (
+              <Text key={index} style={styles.value}>
+                • {typeof item === 'object' ? JSON.stringify(item) : item}
+              </Text>
+            ))}
+          </View>
+        ) : (
+          <Text style={styles.value}>
+            {typeof value === 'boolean' ? (value ? 'Yes' : 'No') : value.toString()}
+          </Text>
+        )}
+      </View>
+    );
+  };
+
+  if (!tripData) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.errorContainer}>
           <Icon name="alert-circle" size={48} color="#ff6b6b" />
           <Text style={styles.errorText}>Trip details not found</Text>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-          >
-            <Text style={styles.backButtonText}>Go Back</Text>
-          </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
@@ -75,84 +146,187 @@ const TripDetailsScreen = ({ route, navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView>
-        {trip.image && (
-          <Image 
-            source={trip.image} 
-            style={styles.image}
-            defaultSource={require('../../../assets/image.png')}
+      <StatusBar barStyle="light-content" />
+
+      {/* Animated Header */}
+      <Animated.View style={[styles.header, { height: headerHeight }]}>
+        {tripData.images?.[0] ? (
+          <Animated.Image
+            source={{ uri: tripData.images[0] }}
+            style={[styles.headerImage, { opacity: imageOpacity }]}
+          />
+        ) : (
+          <Animated.View
+            style={[
+              styles.headerImage,
+              { backgroundColor: colors.primary, opacity: imageOpacity }
+            ]}
           />
         )}
+        <View style={styles.headerOverlay} />
         
-        {/* Back Button */}
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Icon name="arrow-back" size={24} color="#fff" />
-        </TouchableOpacity>
+        {/* Header Content */}
+        <Animated.View style={[styles.headerContent, { opacity: headerTitleOpacity }]}>
+          <Text style={styles.headerTitle} numberOfLines={1}>
+            {tripData.title}
+          </Text>
+        </Animated.View>
 
-        <View style={styles.content}>
-          <View style={styles.header}>
-            <Text style={styles.title}>{trip.name || 'Trip Details'}</Text>
-            {trip.rating && (
-              <View style={styles.ratingContainer}>
-                <Icon name="star" size={20} color="#FFD700" />
-                <Text style={styles.rating}>{trip.rating}</Text>
-              </View>
-            )}
+        {/* Navigation Buttons */}
+        <View style={styles.headerButtons}>
+          <TouchableOpacity
+            style={styles.headerButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Icon name="arrow-back" size={24} color={colors.white} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.headerButton}
+            onPress={handleShare}
+          >
+            <Icon name="share-outline" size={24} color={colors.white} />
+          </TouchableOpacity>
+        </View>
+      </Animated.View>
+
+      <ScrollView
+        style={styles.scrollView}
+        showsVerticalScrollIndicator={false}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: false }
+        )}
+        scrollEventThrottle={16}
+      >
+        {/* Trip Title Section */}
+        <View style={styles.section}>
+          <Text style={styles.title}>{tripData.title}</Text>
+          <View style={styles.locationRow}>
+            <Icon name="location-outline" size={20} color={colors.primary} />
+            <Text style={styles.location}>{tripData.mainDestination}</Text>
+          </View>
+        </View>
+
+        {/* Quick Info Section */}
+        <View style={styles.quickInfoSection}>
+          <View style={styles.quickInfoItem}>
+            <Icon name="calendar-outline" size={24} color={colors.primary} />
+            <View style={styles.quickInfoText}>
+              <Text style={styles.quickInfoLabel}>Dates</Text>
+              <Text style={styles.quickInfoValue}>
+                {formatDate(tripData.startDate)} - {formatDate(tripData.endDate)}
+              </Text>
+            </View>
           </View>
 
-          {/* Trip Overview */}
-          <View style={styles.overviewContainer}>
-            {trip.duration && (
-              <View style={styles.overviewItem}>
-                <Icon name="time" size={24} color="#2196F3" />
-                <Text style={styles.overviewText}>{trip.duration}</Text>
-              </View>
-            )}
-            {trip.price && (
-              <View style={styles.overviewItem}>
-                <Icon name="pricetag" size={24} color="#2196F3" />
-                <Text style={styles.overviewText}>{trip.price}</Text>
-              </View>
-            )}
-            {trip.groupSize && (
-              <View style={styles.overviewItem}>
-                <Icon name="people" size={24} color="#2196F3" />
-                <Text style={styles.overviewText}>{trip.groupSize}</Text>
-              </View>
-            )}
-          </View>
+          <View style={styles.quickInfoDivider} />
 
-          {/* Interests Tags */}
-          {trip.interests && trip.interests.length > 0 && (
+          <View style={styles.quickInfoItem}>
+            <Icon name="wallet-outline" size={24} color={colors.primary} />
+            <View style={styles.quickInfoText}>
+              <Text style={styles.quickInfoLabel}>Budget</Text>
+              <Text style={styles.quickInfoValue}>${tripData.budget}</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Transport Section */}
+        <View style={styles.section}>
+          {renderSectionTitle('Transport', 'car-outline')}
+          <View style={styles.transportCard}>
+            <Icon 
+              name={
+                tripData.transportMode === 'plane' ? 'airplane' :
+                tripData.transportMode === 'train' ? 'train' :
+                tripData.transportMode === 'bus' ? 'bus' : 'car'
+              }
+              size={24}
+              color={colors.primary}
+            />
+            <Text style={styles.transportText}>
+              {tripData.transportMode.charAt(0).toUpperCase() + tripData.transportMode.slice(1)}
+            </Text>
+          </View>
+        </View>
+
+        {/* Interests Section */}
+        {tripData.interests?.length > 0 && (
+          <View style={styles.section}>
+            {renderSectionTitle('Interests', 'heart-outline')}
             <View style={styles.interestsContainer}>
-              {trip.interests.map((interest, index) => (
-                <View key={index} style={styles.interestTag}>
-                  <Text style={styles.interestText}>{interest}</Text>
+              {tripData.interests.map((interest, index) => (
+                <View key={index} style={styles.interestChip}>
+                  <Icon name="checkmark-circle" size={20} color={colors.primary} />
+                  <Text style={styles.interestText}>
+                    {interest.charAt(0).toUpperCase() + interest.slice(1)}
+                  </Text>
                 </View>
               ))}
             </View>
-          )}
-
-          {/* Itinerary Section */}
-          <View style={styles.itinerarySection}>
-            <Text style={styles.sectionTitle}>Trip Itinerary</Text>
-            <FlatList
-              data={itinerary}
-              renderItem={renderItineraryDay}
-              keyExtractor={item => item.id}
-              scrollEnabled={false}
-            />
           </View>
+        )}
 
-          {/* Book Now Button */}
-          <TouchableOpacity 
-            style={styles.bookButton}
-            onPress={() => navigation.navigate('BookTrip', { tripId: trip.id })}
+        {/* Requirements Section */}
+        <View style={styles.section}>
+          {renderSectionTitle('Requirements', 'alert-circle-outline')}
+          <View style={styles.requirementsContainer}>
+            <View style={styles.requirementItem}>
+              <Icon 
+                name={tripData.visaRequired ? 'checkmark-circle' : 'close-circle'} 
+                size={24} 
+                color={tripData.visaRequired ? colors.primary : colors.textSecondary} 
+              />
+              <Text style={styles.requirementText}>Visa Required</Text>
+            </View>
+            <View style={styles.requirementItem}>
+              <Icon 
+                name={tripData.insuranceRequired ? 'checkmark-circle' : 'close-circle'} 
+                size={24} 
+                color={tripData.insuranceRequired ? colors.primary : colors.textSecondary} 
+              />
+              <Text style={styles.requirementText}>Insurance Required</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Images Gallery */}
+        {tripData.images?.length > 0 && (
+          <View style={styles.section}>
+            {renderSectionTitle('Gallery', 'images-outline')}
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false}
+              style={styles.galleryContainer}
+            >
+              {tripData.images.map((image, index) => (
+                <Image
+                  key={index}
+                  source={{ uri: image }}
+                  style={styles.galleryImage}
+                />
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity
+            style={[styles.button, styles.editButton]}
+            onPress={handleEditTrip}
           >
-            <Text style={styles.bookButtonText}>Book This Trip</Text>
+            <Icon name="create-outline" size={20} color="#fff" />
+            <Text style={styles.buttonText}>Edit Trip</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.button, styles.confirmButton, isSubmitting && styles.disabledButton]}
+            onPress={handleConfirmTrip}
+            disabled={isSubmitting}
+          >
+            <Icon name="checkmark-outline" size={20} color="#fff" />
+            <Text style={styles.buttonText}>
+              {isSubmitting ? 'Creating...' : 'Confirm Trip'}
+            </Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -163,149 +337,233 @@ const TripDetailsScreen = ({ route, navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.background,
   },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
   },
   errorText: {
     fontSize: 18,
-    color: '#666',
-    marginTop: 16,
-    marginBottom: 24,
+    color: colors.text,
+    marginTop: spacing.m,
   },
-  image: {
-    width: '100%',
-    height: 300,
-  },
-  backButton: {
+  header: {
     position: 'absolute',
-    top: 16,
-    left: 16,
+    top: 0,
+    left: 0,
+    right: 0,
+    overflow: 'hidden',
+    zIndex: 1,
+  },
+  headerImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  headerOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: colors.heroOverlay,
+  },
+  headerContent: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: spacing.l,
+  },
+  headerTitle: {
+    color: colors.white,
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  headerButtons: {
+    position: 'absolute',
+    top: spacing.l,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.l,
+  },
+  headerButton: {
     width: 40,
     height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: borderRadius.round,
+    backgroundColor: 'rgba(0,0,0,0.3)',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  content: {
-    padding: 16,
+  scrollView: {
+    flex: 1,
+    marginTop: HEADER_MIN_HEIGHT,
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
+  section: {
+    padding: spacing.l,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    flex: 1,
-    marginRight: 16,
+    color: colors.text,
+    marginBottom: spacing.s,
   },
-  ratingContainer: {
+  locationRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  rating: {
-    marginLeft: 4,
-    fontSize: 18,
+  location: {
+    fontSize: 16,
+    color: colors.textSecondary,
+    marginLeft: spacing.xs,
+  },
+  quickInfoSection: {
+    flexDirection: 'row',
+    backgroundColor: colors.backgroundLight,
+    margin: spacing.l,
+    padding: spacing.l,
+    borderRadius: borderRadius.l,
+  },
+  quickInfoItem: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  quickInfoText: {
+    marginLeft: spacing.s,
+  },
+  quickInfoLabel: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginBottom: spacing.xs,
+  },
+  quickInfoValue: {
+    fontSize: 14,
+    color: colors.text,
     fontWeight: '600',
   },
-  overviewContainer: {
+  quickInfoDivider: {
+    width: 1,
+    backgroundColor: colors.border,
+    marginHorizontal: spacing.l,
+  },
+  sectionTitleContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 24,
-    backgroundColor: '#f5f5f5',
-    padding: 16,
-    borderRadius: 12,
-  },
-  overviewItem: {
     alignItems: 'center',
+    marginBottom: spacing.m,
   },
-  overviewText: {
-    marginTop: 8,
-    fontSize: 14,
-    color: '#666',
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: colors.text,
+    marginLeft: spacing.s,
+  },
+  transportCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.backgroundLight,
+    padding: spacing.l,
+    borderRadius: borderRadius.l,
+  },
+  transportText: {
+    marginLeft: spacing.m,
+    fontSize: 16,
+    color: colors.text,
+    fontWeight: '500',
   },
   interestsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginBottom: 24,
+    gap: spacing.s,
   },
-  interestTag: {
-    backgroundColor: '#e3f2fd',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    marginRight: 8,
-    marginBottom: 8,
-  },
-  interestText: {
-    color: '#2196F3',
-    fontSize: 14,
-  },
-  itinerarySection: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    marginBottom: 16,
-  },
-  dayContainer: {
-    marginBottom: 24,
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  dayHeader: {
-    marginBottom: 12,
-  },
-  dayText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#2196F3',
-    marginBottom: 4,
-  },
-  dayTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  activityItem: {
+  interestChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 8,
+    backgroundColor: colors.backgroundLight,
+    paddingHorizontal: spacing.m,
+    paddingVertical: spacing.s,
+    borderRadius: borderRadius.l,
   },
-  activityText: {
-    marginLeft: 8,
+  interestText: {
+    marginLeft: spacing.xs,
+    color: colors.text,
+  },
+  requirementsContainer: {
+    backgroundColor: colors.backgroundLight,
+    padding: spacing.l,
+    borderRadius: borderRadius.l,
+  },
+  requirementItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.m,
+  },
+  requirementText: {
+    marginLeft: spacing.s,
     fontSize: 16,
-    color: '#666',
+    color: colors.text,
   },
-  bookButton: {
-    backgroundColor: '#2196F3',
-    paddingVertical: 16,
-    borderRadius: 12,
+  galleryContainer: {
+    marginTop: spacing.s,
+  },
+  galleryImage: {
+    width: width * 0.7,
+    height: width * 0.5,
+    borderRadius: borderRadius.l,
+    marginRight: spacing.m,
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    padding: spacing.l,
+    gap: spacing.m,
+  },
+  button: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.m,
+    borderRadius: borderRadius.l,
+    gap: spacing.s,
+  },
+  editButton: {
+    backgroundColor: colors.textSecondary,
+  },
+  confirmButton: {
+    backgroundColor: colors.primary,
+  },
+  disabledButton: {
+    opacity: 0.5,
+  },
+  buttonText: {
+    color: colors.white,
+    fontWeight: '600',
+  },
+  detailItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.s,
+  },
+  labelContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
   },
-  bookButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
+  icon: {
+    marginRight: spacing.xs,
   },
-  backButtonText: {
-    color: '#2196F3',
+  label: {
     fontSize: 16,
-    fontWeight: '600',
+    color: colors.textSecondary,
+  },
+  value: {
+    fontSize: 16,
+    color: colors.text,
+  },
+  arrayValue: {
+    flex: 1,
   },
 });
 

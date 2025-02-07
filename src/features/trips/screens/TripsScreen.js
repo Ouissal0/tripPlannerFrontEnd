@@ -1,193 +1,142 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  Dimensions,
-  TextInput,
   TouchableOpacity,
-  ScrollView,
-  Image,
-  Animated,
+  Dimensions,
+  FlatList,
 } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
-import commonStyles, { colors } from '../../../styles/commonStyles';
+import { colors, spacing, borderRadius } from '../../../styles/commonStyles';
+import { tripService } from '../../home/services/tripService';
 
 const { width, height } = Dimensions.get('window');
-const MarkerView = ({ price }) => (
-  <View style={styles.markerWrapper}>
-    <View style={styles.markerContainer}>
-      <Text style={styles.markerPrice}>{price}</Text>
-    </View>
-    <View style={styles.markerArrow} />
-  </View>
-);
-const CARD_HEIGHT = 280;
-const CARD_WIDTH = width * 0.7;
 
-const trips = [
-  {
-    id: '1',
-    coordinate: {
-      latitude: 48.8566,
-      longitude: 2.3522,
-    },
-    title: 'Studio Gare de Paris',
-    description: 'Modern studio near Paris train station',
-    price: '$1,200.00',
-    image: require('../../../assets/image1.png'),
-    rating: 4.7,
-    reviews: 785,
-    interests: ['culture', 'city'],
-  },
-  {
-    id: '2',
-    coordinate: {
-      latitude: 49.4431,
-      longitude: 1.0993,
-    },
-    title: 'Studio Gare de Rouen',
-    description: 'Cozy apartment in the heart of Rouen',
-    price: '$950.50',
-    image: require('../../../assets/image.png'),
-    rating: 4.5,
-    reviews: 456,
-    interests: ['culture', 'history'],
-  },
-  // Add more trips here
-];
-
-const interests = [
-  { id: 'villa', label: 'Villa', icon: 'home' },
-  { id: 'hotel', label: 'Hotel', icon: 'bed' },
-  { id: 'mansion', label: 'Mansion', icon: 'business' },
-];
-
-const TripsScreen = () => {
-  const [selectedInterests, setSelectedInterests] = useState([]);
+const TripsScreen = ({ navigation }) => {
+  const [trips, setTrips] = useState([]);
+  const [selectedTrip, setSelectedTrip] = useState(null);
   const [region, setRegion] = useState({
     latitude: 48.8566,
     longitude: 2.3522,
-    latitudeDelta: 3,
-    longitudeDelta: 3,
+    latitudeDelta: 5,
+    longitudeDelta: 5,
   });
-  
-  const mapRef = useRef(null);
-  const scrollView = useRef(null);
 
-  const toggleInterest = (interest) => {
-    if (selectedInterests.includes(interest)) {
-      setSelectedInterests(selectedInterests.filter(i => i !== interest));
-    } else {
-      setSelectedInterests([...selectedInterests, interest]);
+  useEffect(() => {
+    loadTrips();
+  }, []);
+
+  const loadTrips = async () => {
+    try {
+      const tripsData = await tripService.getTrips();
+      setTrips(tripsData);
+      
+      // Si des voyages sont disponibles, centrer la carte sur le premier voyage
+      if (tripsData.length > 0 && tripsData[0].latitude && tripsData[0].longitude) {
+        setRegion({
+          latitude: tripsData[0].latitude,
+          longitude: tripsData[0].longitude,
+          latitudeDelta: 5,
+          longitudeDelta: 5,
+        });
+      }
+    } catch (error) {
+      console.error('Error loading trips:', error);
     }
   };
 
-  const onMarkerPress = (mapEventData) => {
-    const markerID = mapEventData._targetInst.return.key;
-    let x = (markerID * CARD_WIDTH) + (markerID * 20);
-    
-    scrollView.current?.scrollTo({x: x, y: 0, animated: true});
+  const handleTripPress = (trip) => {
+    setSelectedTrip(trip);
+    if (trip.latitude && trip.longitude) {
+      setRegion({
+        latitude: trip.latitude,
+        longitude: trip.longitude,
+        latitudeDelta: 1,
+        longitudeDelta: 1,
+      });
+    }
   };
 
-  return (
-    <View style={commonStyles.container}>
-      {/* Search Bar */}
-      <View style={styles.searchContainer}>
-        <View style={styles.searchBar}>
-          <Icon name="search" size={20} color={colors.textSecondary} />
-          <TextInput
-            placeholder="Search name, city, or everything..."
-            style={styles.searchInput}
-            placeholderTextColor={colors.textSecondary}
-          />
+  const handleMarkerPress = (trip) => {
+    navigation.navigate('TripDetails', { tripData: trip });
+  };
+
+  const renderTripItem = ({ item }) => (
+    <TouchableOpacity
+      style={[
+        styles.tripCard,
+        selectedTrip?.id === item.id && styles.selectedTripCard,
+      ]}
+      onPress={() => handleTripPress(item)}
+    >
+      <View style={styles.tripInfo}>
+        <Text style={styles.tripTitle} numberOfLines={1}>
+          {item.title}
+        </Text>
+        <View style={styles.tripDetails}>
+          <Icon name="location-outline" size={16} color={colors.primary} />
+          <Text style={styles.tripLocation} numberOfLines={1}>
+            {item.mainDestination}
+          </Text>
         </View>
       </View>
+      <Icon
+        name="chevron-forward"
+        size={24}
+        color={colors.primary}
+        style={styles.arrow}
+      />
+    </TouchableOpacity>
+  );
 
-      {/* Interest Filters */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.interestsContainer}
-        contentContainerStyle={styles.interestsContent}
-      >
-        {interests.map((interest) => (
-          <TouchableOpacity
-            key={interest.id}
-            style={[
-              styles.interestButton,
-              selectedInterests.includes(interest.id) && styles.interestButtonActive
-            ]}
-            onPress={() => toggleInterest(interest.id)}
-          >
-            <Icon 
-              name={interest.icon} 
-              size={16} 
-              color={selectedInterests.includes(interest.id) ? colors.white : colors.primary}
-            />
-            <Text style={[
-              styles.interestText,
-              selectedInterests.includes(interest.id) && styles.interestTextActive
-            ]}>
-              {interest.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+  return (
+    <SafeAreaView style={styles.container}>
+      <View style={styles.mapContainer}>
+        <MapView
+          provider={PROVIDER_GOOGLE}
+          style={styles.map}
+          region={region}
+          onRegionChangeComplete={setRegion}
+        >
+          {trips.map((trip) => (
+            trip.latitude && trip.longitude && (
+              <Marker
+                key={trip.id}
+                coordinate={{
+                  latitude: trip.latitude,
+                  longitude: trip.longitude,
+                }}
+                onPress={() => handleMarkerPress(trip)}
+              >
+                <View style={styles.markerContainer}>
+                  <Icon name="location" size={30} color={colors.primary} />
+                  <View style={styles.markerLabel}>
+                    <Text style={styles.markerText} numberOfLines={1}>
+                      {trip.title}
+                    </Text>
+                  </View>
+                </View>
+              </Marker>
+            )
+          ))}
+        </MapView>
+      </View>
 
-      {/* Map View */}
-      <MapView
-        ref={mapRef}
-        style={styles.map}
-        provider={PROVIDER_GOOGLE}
-        initialRegion={region}
-      >
-        {trips.map((trip) => (
-          <Marker
-  key={trip.id}
-  coordinate={trip.coordinate}
-  onPress={(e) => onMarkerPress(e)}
->
-  <MarkerView price={trip.price} />
-</Marker>
-        ))}
-      </MapView>
-
-      {/* Bottom Cards */}
-      <Animated.ScrollView
-        ref={scrollView}
-        horizontal
-        scrollEventThrottle={1}
-        showsHorizontalScrollIndicator={false}
-        style={styles.scrollView}
-        pagingEnabled
-        snapToInterval={CARD_WIDTH + 20}
-        snapToAlignment="center"
-        contentContainerStyle={styles.endPadding}
-      >
-        {trips.map((trip) => (
-          <View style={styles.card} key={trip.id}>
-            <Image
-              source={trip.image}
-              style={styles.cardImage}
-              resizeMode="cover"
-            />
-            <View style={styles.textContent}>
-              <Text style={styles.cardTitle}>{trip.title}</Text>
-              <View style={styles.ratingContainer}>
-                <Icon name="star" size={16} color="#FFD700" />
-                <Text style={styles.ratingText}>
-                  {trip.rating} • {trip.reviews} Reviews
-                </Text>
-              </View>
-              <Text style={styles.cardDescription}>{trip.description}</Text>
-              <Text style={styles.cardPrice}>{trip.price}<Text style={styles.perNight}>/night</Text></Text>
-            </View>
-          </View>
-        ))}
-      </Animated.ScrollView>
-    </View>
+      <View style={styles.tripsListContainer}>
+        <Text style={styles.sectionTitle}>Mes Voyages</Text>
+        <FlatList
+          data={trips}
+          renderItem={renderTripItem}
+          keyExtractor={(item) => item.id}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.tripsList}
+        />
+      </View>
+    </SafeAreaView>
   );
 };
 
@@ -196,162 +145,96 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  searchContainer: {
-    position: 'absolute',
-    top: 10,
-    left: 0,
-    right: 0,
-    height:50,
-    zIndex: 3,
-    paddingHorizontal: 10,
-  },
-  searchBar: {
-    flexDirection: 'row',
-    backgroundColor: colors.white,
-    borderRadius: 30,
-    padding: 5,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.30,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  searchInput: {
+  mapContainer: {
     flex: 1,
-    marginLeft: 10,
-    fontSize: 16,
-    color: colors.text,
-  },
-  interestsContainer: {
-    position: 'absolute',
-    top: 70,
-    left: 0,
-    right: 0,
-    zIndex: 1,
-  },
-  interestsContent: {
-    paddingHorizontal: 10,
-  },
-  interestButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.white,
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 20,
-    marginRight: 10,
-    borderWidth: 1,
-    borderColor: colors.primary,
-  },
-  interestButtonActive: {
-    backgroundColor: colors.primary,
-  },
-  interestText: {
-    marginLeft: 5,
-    color: colors.primary,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  interestTextActive: {
-    color: colors.white,
+    overflow: 'hidden',
   },
   map: {
     flex: 1,
   },
-  markerWrapper: {
-    alignItems: 'center',
-  },
-  markerContainer: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 15,
-    borderWidth: 1,
-    borderColor: colors.white,
-    overflow: 'visible',
-    zIndex: 1,
-  },
-  markerPrice: {
-    color: colors.white,
-    fontWeight: 'bold',
-    fontSize: 12,
-    textAlign: 'center',
-  },
-  markerArrow: {
-    width: 0,
-    height: 0,
-    backgroundColor: 'transparent',
-    borderStyle: 'solid',
-    borderLeftWidth: 6,
-    borderRightWidth: 6,
-    borderTopWidth: 8,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-    borderTopColor: colors.primary,
-    marginTop: -1,
-  },
-  scrollView: {
+  tripsListContainer: {
     position: 'absolute',
-    bottom: 30,
+    bottom: 0,
     left: 0,
     right: 0,
-    paddingVertical: 10,
-  },
-  endPadding: {
-    paddingHorizontal: 20,
-  },
-  card: {
-    elevation: 2,
-    backgroundColor: colors.white,
-    borderRadius: 15,
-    marginHorizontal: 10,
+    backgroundColor: colors.background,
+    paddingVertical: spacing.m,
+    borderTopLeftRadius: borderRadius.xl,
+    borderTopRightRadius: borderRadius.xl,
     shadowColor: '#000',
-    shadowRadius: 5,
-    shadowOpacity: 0.3,
-    shadowOffset: { x: 2, y: -2 },
-    height: CARD_HEIGHT,
-    width: CARD_WIDTH,
-    overflow: 'hidden',
+    shadowOffset: {
+      width: 0,
+      height: -3,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4.65,
+    elevation: 6,
   },
-  cardImage: {
-    flex: 3,
-    width: '100%',
-    height: '100%',
-  },
-  textContent: {
-    flex: 2,
-    padding: 10,
-  },
-  cardTitle: {
-    fontSize: 16,
+  sectionTitle: {
+    fontSize: 18,
     fontWeight: 'bold',
     color: colors.text,
+    marginLeft: spacing.l,
+    marginBottom: spacing.m,
   },
-  ratingContainer: {
+  tripsList: {
+    paddingHorizontal: spacing.l,
+  },
+  tripCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 5,
+    backgroundColor: colors.backgroundLight,
+    padding: spacing.m,
+    borderRadius: borderRadius.l,
+    marginRight: spacing.m,
+    width: width * 0.7,
   },
-  ratingText: {
-    marginLeft: 5,
-    fontSize: 12,
-    color: colors.textSecondary,
+  selectedTripCard: {
+    backgroundColor: colors.primary + '20',
+    borderColor: colors.primary,
+    borderWidth: 1,
   },
-  cardDescription: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    marginVertical: 5,
+  tripInfo: {
+    flex: 1,
   },
-  cardPrice: {
+  tripTitle: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: colors.primary,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: spacing.xs,
   },
-  perNight: {
-    fontSize: 12,
+  tripDetails: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  tripLocation: {
+    fontSize: 14,
     color: colors.textSecondary,
-    fontWeight: 'normal',
+    marginLeft: spacing.xs,
+  },
+  arrow: {
+    marginLeft: spacing.m,
+  },
+  markerContainer: {
+    alignItems: 'center',
+  },
+  markerLabel: {
+    backgroundColor: colors.white,
+    padding: spacing.xs,
+    borderRadius: borderRadius.m,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  markerText: {
+    fontSize: 12,
+    color: colors.text,
+    maxWidth: 100,
   },
 });
 

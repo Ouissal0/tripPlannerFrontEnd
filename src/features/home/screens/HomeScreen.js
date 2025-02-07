@@ -1,113 +1,111 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
+  FlatList,
   TextInput,
   ScrollView,
-  FlatList,
-  Dimensions,
-  RefreshControl,
+  Image,
   ImageBackground,
   Alert,
+  ActivityIndicator,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { colors, spacing } from '../../../styles/commonStyles';
-import AuthService from '../../auth/services/AuthService';
+import { colors, spacing, borderRadius } from '../../../styles/commonStyles';
+import { tripService } from '../services/tripService';
 
 const { width } = Dimensions.get('window');
 
 const HomeScreen = ({ navigation, route }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedInterests, setSelectedInterests] = useState([]);
-  const [refreshing, setRefreshing] = useState(false);
-  const [userData, setUserData] = useState(null);
+  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [trips, setTrips] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadUserData();
-  }, []);
-
-  const loadUserData = async () => {
-    try {
-      const user = await AuthService.getUserData();
-      setUserData(user);
-    } catch (error) {
-      console.error('Error loading user data:', error);
-    }
-  };
-
-  const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    // Add your refresh logic here
-    setTimeout(() => {
-      setRefreshing(false);
-    }, 2000);
-  }, []);
-
-  const interests = [
-    'Adventure', 'Culture', 'Nature', 'Food', 'Beach',
-    'Mountains', 'Cities', 'History', 'Art', 'Shopping'
+  const categories = [
+    { id: 'all', name: 'All', icon: 'globe-outline' },
+    { id: 'beach', name: 'Beach', icon: 'sunny-outline' },
+    { id: 'mountain', name: 'Mountain', icon: 'triangle-outline' },
+    { id: 'city', name: 'City', icon: 'business-outline' },
+    { id: 'cultural', name: 'Cultural', icon: 'museum-outline' },
   ];
 
   const quickActions = [
     {
-      icon: 'map-outline',
-      title: 'Explore',
-      onPress: () => navigation.navigate('Map'),
-    },
-    {
-      icon: 'calendar-outline',
-      title: 'Plan Trip',
+      id: 'create',
+      name: 'Create Trip',
+      icon: 'add-circle-outline',
+      color: colors.primary,
       onPress: () => navigation.navigate('CreateTrip'),
     },
     {
+      id: 'explore',
+      name: 'Explore',
+      icon: 'compass-outline',
+      color: '#FF6B6B',
+      onPress: () => navigation.navigate('Explore'),
+    },
+    {
+      id: 'favorites',
+      name: 'Favorites',
       icon: 'heart-outline',
-      title: 'Favorites',
+      color: '#4ECDC4',
       onPress: () => navigation.navigate('Favorites'),
     },
     {
-      icon: 'people-outline',
-      title: 'Groups',
-      onPress: () => navigation.navigate('Groups'),
+      id: 'nearby',
+      name: 'Nearby',
+      icon: 'location-outline',
+      color: '#FFD93D',
+      onPress: () => navigation.navigate('Nearby'),
     },
   ];
 
-  const popularDestinations = [
-    {
-      id: '1',
-      name: 'Paris',
-      country: 'France',
-      image: require('../../../assets/image.png'),
-      rating: 4.8,
-    },
-    {
-      id: '2',
-      name: 'Tokyo',
-      country: 'Japan',
-      image: require('../../../assets/image.png'),
-      rating: 4.9,
-    },
-    {
-      id: '3',
-      name: 'New York',
-      country: 'USA',
-      image: require('../../../assets/image.png'),
-      rating: 4.7,
-    },
-  ];
+  useEffect(() => {
+    fetchTrips();
+  }, [route]);
 
-  const renderSearchBar = () => (
-    <View style={styles.searchContainer}>
-      <Icon name="search-outline" size={20} color={colors.textSecondary} />
-      <TextInput
-        style={styles.searchInput}
-        placeholder="Search destinations..."
-        value={searchQuery}
-        onChangeText={setSearchQuery}
-        placeholderTextColor={colors.textSecondary}
-      />
+  const fetchTrips = async () => {
+    try {
+      const fetchedTrips = await tripService.getTrips();
+      setTrips(fetchedTrips);
+    } catch (error) {
+      console.error('Erreur:', error);
+      Alert.alert('Erreur', 'Impossible de charger les voyages');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const renderHeader = () => (
+    <View style={styles.header}>
+      <View style={styles.headerTop}>
+        <View>
+          <Text style={styles.greeting}>Hello!</Text>
+          <Text style={styles.subtitle}>Where do you want to go?</Text>
+        </View>
+        <TouchableOpacity 
+          style={styles.profileButton}
+          onPress={() => navigation.navigate('Profile')}
+        >
+          <Icon name="person-circle-outline" size={32} color={colors.primary} />
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.searchContainer}>
+        <Icon name="search-outline" size={20} color={colors.textSecondary} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search destinations..."
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholderTextColor={colors.textSecondary}
+        />
+      </View>
     </View>
   );
 
@@ -115,48 +113,47 @@ const HomeScreen = ({ navigation, route }) => {
     <View style={styles.quickActionsContainer}>
       <Text style={styles.sectionTitle}>Quick Actions</Text>
       <View style={styles.quickActionsGrid}>
-        {quickActions.map((action, index) => (
+        {quickActions.map((action) => (
           <TouchableOpacity
-            key={index}
+            key={action.id}
             style={styles.quickActionItem}
             onPress={action.onPress}
           >
-            <View style={styles.quickActionIcon}>
-              <Icon name={action.icon} size={24} color={colors.primary} />
+            <View style={[styles.quickActionIcon, { backgroundColor: action.color + '20' }]}>
+              <Icon name={action.icon} size={24} color={action.color} />
             </View>
-            <Text style={styles.quickActionText}>{action.title}</Text>
+            <Text style={styles.quickActionText}>{action.name}</Text>
           </TouchableOpacity>
         ))}
       </View>
     </View>
   );
 
-  const renderInterests = () => (
-    <View style={styles.interestsContainer}>
-      <Text style={styles.sectionTitle}>Explore Interests</Text>
+  const renderCategories = () => (
+    <View style={styles.categoriesContainer}>
+      <Text style={styles.sectionTitle}>Categories</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-        {interests.map((interest, index) => (
+        {categories.map((category) => (
           <TouchableOpacity
-            key={index}
+            key={category.id}
             style={[
-              styles.interestChip,
-              selectedInterests.includes(interest) && styles.selectedInterestChip,
+              styles.categoryItem,
+              selectedCategory === category.name && styles.selectedCategory,
             ]}
-            onPress={() => {
-              if (selectedInterests.includes(interest)) {
-                setSelectedInterests(selectedInterests.filter(item => item !== interest));
-              } else {
-                setSelectedInterests([...selectedInterests, interest]);
-              }
-            }}
+            onPress={() => setSelectedCategory(category.name)}
           >
+            <Icon
+              name={category.icon}
+              size={20}
+              color={selectedCategory === category.name ? colors.white : colors.primary}
+            />
             <Text
               style={[
-                styles.interestText,
-                selectedInterests.includes(interest) && styles.selectedInterestText,
+                styles.categoryText,
+                selectedCategory === category.name && styles.selectedCategoryText,
               ]}
             >
-              {interest}
+              {category.name}
             </Text>
           </TouchableOpacity>
         ))}
@@ -164,69 +161,108 @@ const HomeScreen = ({ navigation, route }) => {
     </View>
   );
 
-  const renderDestinationCard = ({ item }) => (
-    <TouchableOpacity
-      style={styles.destinationCard}
-      onPress={() => navigation.navigate('PlaceDetails', { place: item })}
-    >
-      <ImageBackground
-        source={item.image}
-        style={styles.destinationImage}
-        imageStyle={{ borderRadius: 15 }}
+  const renderTripCard = ({ item }) => {
+    const defaultImage = require('../../../assets/image.png');
+    let imageSource = defaultImage;
+
+    if (item.images && item.images.length > 0 && item.images[0]) {
+      const firstImage = item.images[0];
+      if (firstImage.startsWith('data:image')) {
+        imageSource = { uri: firstImage };
+      } else if (firstImage.startsWith('http')) {
+        imageSource = { 
+          uri: firstImage,
+          cache: 'reload',
+        };
+      } else {
+        try {
+          imageSource = { 
+            uri: `data:image/jpeg;base64,${firstImage}`,
+          };
+        } catch (error) {
+          imageSource = defaultImage;
+        }
+      }
+    }
+
+    return (
+      <TouchableOpacity
+        style={styles.tripCard}
+        onPress={() => navigation.navigate('TripDetails', { tripData: item })}
+        activeOpacity={0.8}
       >
-        <View style={styles.destinationOverlay}>
-          <View style={styles.destinationInfo}>
-            <Text style={styles.destinationName}>{item.name}</Text>
-            <Text style={styles.destinationCountry}>{item.country}</Text>
+        <ImageBackground
+          source={imageSource}
+          style={styles.tripImage}
+          imageStyle={styles.tripImageStyle}
+          resizeMode="cover"
+        >
+          <View style={styles.tripOverlay}>
+            <View style={styles.tripInfo}>
+              <Text style={styles.tripTitle} numberOfLines={1}>
+                {item.title}
+              </Text>
+              <View style={styles.tripDetails}>
+                <View style={styles.tripDetailItem}>
+                  <Icon name="location-outline" size={16} color={colors.white} />
+                  <Text style={styles.tripDetailText} numberOfLines={1}>
+                    {item.mainDestination}
+                  </Text>
+                </View>
+                <View style={styles.tripDetailItem}>
+                  <Icon name="calendar-outline" size={16} color={colors.white} />
+                  <Text style={styles.tripDetailText}>
+                    {new Date(item.startDate).toLocaleDateString()}
+                  </Text>
+                </View>
+              </View>
+            </View>
           </View>
-          <View style={styles.ratingContainer}>
-            <Icon name="star" size={16} color="#FFD700" />
-            <Text style={styles.ratingText}>{item.rating}</Text>
+        </ImageBackground>
+      </TouchableOpacity>
+    );
+  };
+
+  const renderPopularTrips = () => (
+    <View style={styles.popularTripsContainer}>
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>Popular Trips</Text>
+        <TouchableOpacity onPress={() => navigation.navigate('AllTrips')}>
+          <Text style={styles.seeAllText}>See All</Text>
+        </TouchableOpacity>
+      </View>
+      <FlatList
+        data={trips}
+        renderItem={renderTripCard}
+        keyExtractor={(item) => item.id.toString()}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.tripsListContainer}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Icon name="airplane-outline" size={48} color={colors.textSecondary} />
+            <Text style={styles.emptyText}>No trips available</Text>
           </View>
-        </View>
-      </ImageBackground>
-    </TouchableOpacity>
+        }
+      />
+    </View>
   );
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-      >
-        <ImageBackground
-          source={require('../../../assets/imageSignup.png')}
-          style={styles.header}
-        >
-          <View style={styles.headerContent}>
-            <Text style={styles.welcomeText}>
-              Welcome back{userData ? `, ${userData.firstName}!` : '!'}
-            </Text>
-            <Text style={styles.headerSubtitle}>
-              Where would you like to explore today?
-            </Text>
-          </View>
-        </ImageBackground>
-
-        <View style={styles.content}>
-          {renderSearchBar()}
-          
-          {renderInterests()}
-
-          <View style={styles.popularContainer}>
-            <Text style={styles.sectionTitle}>Popular Destinations</Text>
-            <FlatList
-              data={popularDestinations}
-              renderItem={renderDestinationCard}
-              keyExtractor={item => item.id}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.destinationsList}
-            />
-            {renderQuickActions()}
-          </View>
-        </View>
+      <ScrollView showsVerticalScrollIndicator={false}>
+        {renderHeader()}
+        {renderQuickActions()}
+        {renderCategories()}
+        {renderPopularTrips()}
       </ScrollView>
     </SafeAreaView>
   );
@@ -235,62 +271,53 @@ const HomeScreen = ({ navigation, route }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.white,
+    backgroundColor: colors.background,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   header: {
-    height: 200,
-    justifyContent: 'flex-end',
-  },
-  headerContent: {
-    padding: spacing.xl,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-  },
-  welcomeText: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: colors.white,
-    marginBottom: spacing.xs,
-    textShadowColor: 'rgba(0, 0, 0, 0.75)',
-    textShadowOffset: { width: -1, height: 1 },
-    textShadowRadius: 10,
-  },
-  headerSubtitle: {
-    fontSize: 16,
-    color: colors.white,
-    opacity: 0.9,
-    textShadowColor: 'rgba(0, 0, 0, 0.75)',
-    textShadowOffset: { width: -1, height: 1 },
-    textShadowRadius: 10,
-  },
-  content: {
-    marginTop: -20,
-    backgroundColor: colors.white,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
     padding: spacing.l,
+    backgroundColor: colors.white,
+  },
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.m,
+  },
+  greeting: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: colors.text,
+    marginBottom: spacing.xs,
+  },
+  subtitle: {
+    fontSize: 16,
+    color: colors.textSecondary,
+  },
+  profileButton: {
+    padding: spacing.xs,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.background,
-    paddingHorizontal: spacing.m,
-    borderRadius: 15,
-    marginBottom: spacing.l,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
+    backgroundColor: colors.backgroundLight,
+    padding: spacing.m,
+    borderRadius: borderRadius.l,
+    marginTop: spacing.s,
   },
   searchInput: {
     flex: 1,
-    paddingVertical: spacing.m,
-    paddingHorizontal: spacing.s,
+    marginLeft: spacing.s,
     fontSize: 16,
     color: colors.text,
+  },
+  quickActionsContainer: {
+    padding: spacing.l,
+    backgroundColor: colors.white,
   },
   sectionTitle: {
     fontSize: 20,
@@ -298,120 +325,131 @@ const styles = StyleSheet.create({
     color: colors.text,
     marginBottom: spacing.m,
   },
-  quickActionsContainer: {
-    marginBottom: spacing.xl,
-  },
   quickActionsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
   },
   quickActionItem: {
-    width: (width - spacing.l * 3) / 2,
-    backgroundColor: colors.white,
-    padding: spacing.m,
-    borderRadius: 15,
-    marginBottom: spacing.m,
+    width: '23%',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
+    marginBottom: spacing.m,
   },
   quickActionIcon: {
     width: 50,
     height: 50,
     borderRadius: 25,
-    backgroundColor: colors.background,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: spacing.s,
+    marginBottom: spacing.xs,
   },
   quickActionText: {
-    fontSize: 14,
+    fontSize: 12,
     color: colors.text,
-    fontWeight: '500',
+    textAlign: 'center',
   },
-  interestsContainer: {
-    marginBottom: spacing.xl,
+  categoriesContainer: {
+    padding: spacing.l,
+    backgroundColor: colors.white,
+    marginTop: spacing.m,
   },
-  interestChip: {
-    paddingHorizontal: spacing.m,
-    paddingVertical: spacing.s,
-    backgroundColor: colors.background,
-    borderRadius: 20,
-    marginRight: spacing.s,
-  },
-  selectedInterestChip: {
-    backgroundColor: colors.primary,
-  },
-  interestText: {
-    fontSize: 14,
-    color: colors.text,
-  },
-  selectedInterestText: {
-    color: colors.white,
-  },
-  popularContainer: {
-    marginBottom: spacing.xl,
-  },
-  destinationsList: {
-    paddingRight: spacing.l,
-  },
-  destinationCard: {
-    width: width * 0.8,
-    height: 200,
-    marginRight: spacing.m,
-  },
-  destinationImage: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  destinationOverlay: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    padding: spacing.m,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    borderBottomLeftRadius: 15,
-    borderBottomRightRadius: 15,
-  },
-  destinationInfo: {
-    flex: 1,
-  },
-  destinationName: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: colors.white,
-    textShadowColor: 'rgba(0, 0, 0, 0.75)',
-    textShadowOffset: { width: -1, height: 1 },
-    textShadowRadius: 10,
-  },
-  destinationCountry: {
-    fontSize: 14,
-    color: colors.white,
-    opacity: 0.9,
-    textShadowColor: 'rgba(0, 0, 0, 0.75)',
-    textShadowOffset: { width: -1, height: 1 },
-    textShadowRadius: 10,
-  },
-  ratingContainer: {
+  categoryItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.9)',
-    paddingHorizontal: spacing.s,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingHorizontal: spacing.m,
+    paddingVertical: spacing.s,
+    borderRadius: borderRadius.l,
+    marginRight: spacing.s,
+    backgroundColor: colors.backgroundLight,
   },
-  ratingText: {
-    marginLeft: 4,
-    fontSize: 14,
+  selectedCategory: {
+    backgroundColor: colors.primary,
+  },
+  categoryText: {
+    marginLeft: spacing.xs,
+    color: colors.primary,
+    fontWeight: '600',
+  },
+  selectedCategoryText: {
+    color: colors.white,
+  },
+  popularTripsContainer: {
+    padding: spacing.l,
+    backgroundColor: colors.white,
+    marginTop: spacing.m,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.m,
+  },
+  seeAllText: {
+    color: colors.primary,
+    fontWeight: '600',
+  },
+  tripsListContainer: {
+    paddingRight: spacing.m,
+  },
+  tripCard: {
+    width: width * 0.7,
+    marginRight: spacing.m,
+    borderRadius: borderRadius.l,
+    elevation: 3,
+    backgroundColor: colors.white,
+    shadowColor: colors.shadow,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  tripImage: {
+    height: 200,
+    justifyContent: 'flex-end',
+  },
+  tripImageStyle: {
+    borderRadius: borderRadius.l,
+  },
+  tripOverlay: {
+    padding: spacing.m,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderRadius: borderRadius.l,
+  },
+  tripInfo: {
+    justifyContent: 'flex-end',
+  },
+  tripTitle: {
+    fontSize: 18,
     fontWeight: 'bold',
-    color: colors.text,
+    color: colors.white,
+    marginBottom: spacing.s,
+  },
+  tripDetails: {
+    gap: spacing.xs,
+  },
+  tripDetailItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  tripDetailText: {
+    marginLeft: spacing.xs,
+    fontSize: 14,
+    color: colors.white,
+  },
+  emptyContainer: {
+    width: width * 0.7,
+    height: 200,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.backgroundLight,
+    borderRadius: borderRadius.l,
+  },
+  emptyText: {
+    marginTop: spacing.s,
+    color: colors.textSecondary,
+    fontSize: 16,
   },
 });
 

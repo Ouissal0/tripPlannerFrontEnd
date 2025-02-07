@@ -2,7 +2,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import User from '../models/User';
 
-const API_URL = 'http://192.168.1.14:3000';
+const API_URL = 'http://192.168.1.58:3000';
 
 class AuthService {
   constructor() {
