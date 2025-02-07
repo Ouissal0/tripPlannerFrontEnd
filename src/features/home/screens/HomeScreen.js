@@ -188,7 +188,7 @@ const HomeScreen = ({ navigation, route }) => {
     return (
       <TouchableOpacity
         style={styles.tripCard}
-        onPress={() => navigation.navigate('TripDetails', { tripData: item })}
+        onPress={() => navigation.navigate('PlaceDetails', { tripData: item })}
         activeOpacity={0.8}
       >
         <ImageBackground
